@@ -1,0 +1,3 @@
+-keep class com.spwhatsapp.** { *; }
+-keepattributes *Annotation*
+-dontwarn okhttp3.**
