@@ -24,12 +24,19 @@ jobs:
       - name: Setup Android SDK
         uses: android-actions/setup-android@v3
 
-      - name: Download Gradle Wrapper JAR
+      - name: Install Gradle 8.4 & Generate Wrapper
         run: |
-          mkdir -p gradle/wrapper
-          curl -fL "https://repo.gradle.org/gradle/libs-releases/org/gradle/gradle-wrapper/8.4/gradle-wrapper-8.4.jar" \
-            -o gradle/wrapper/gradle-wrapper.jar
-          ls -lh gradle/wrapper/gradle-wrapper.jar
+          # Install gradle via sdk
+          sdk_dir=$(dirname $(which sdkmanager)) 2>/dev/null || true
+          
+          # Use gradle directly from apt or install manually
+          wget -q https://services.gradle.org/distributions/gradle-8.4-bin.zip -P /tmp
+          unzip -q /tmp/gradle-8.4-bin.zip -d /opt/gradle
+          export PATH="/opt/gradle/gradle-8.4/bin:$PATH"
+          
+          # Generate wrapper jar properly
+          gradle wrapper --gradle-version=8.4 --distribution-type=bin
+          ls -lh gradle/wrapper/
 
       - name: Make gradlew executable
         run: chmod +x gradlew
@@ -44,7 +51,9 @@ jobs:
           restore-keys: ${{ runner.os }}-gradle-
 
       - name: Build Debug APK
-        run: ./gradlew assembleDebug --no-daemon --stacktrace
+        run: |
+          export PATH="/opt/gradle/gradle-8.4/bin:$PATH"
+          ./gradlew assembleDebug --no-daemon --stacktrace
 
       - name: Rename APK
         run: |
@@ -54,7 +63,7 @@ jobs:
       - name: Upload APK Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: SP-WhatsApp-Debug-v1.0.${{ github.run_number }}
+          name: SP-WhatsApp-v1.0.${{ github.run_number }}
           path: app/build/outputs/apk/debug/SP-WhatsApp-v1.0.${{ github.run_number }}.apk
           retention-days: 60
 
@@ -64,26 +73,12 @@ jobs:
         with:
           tag_name: v1.0.${{ github.run_number }}
           name: "SP WhatsApp v1.0.${{ github.run_number }}"
-          draft: false
-          prerelease: false
           body: |
             ## SP WhatsApp v1.0.${{ github.run_number }}
-            
-            ### ✅ Features
-            - WhatsApp Web real client
-            - 3 Account support
-            - Chat tabs (All / Groups / Unread)
-            - App Lock (PIN + Fingerprint)
-            - DND Mode
-            - Dark Mode
-            - Media Download
-            - Auto-reply
-            
-            ### 📱 Install
-            1. Download APK below
-            2. Enable "Install from unknown sources"
-            3. Install and enjoy!
-            
+            - ✅ WhatsApp Web real client
+            - ✅ 3 Account support
+            - ✅ Chat tabs, App Lock, DND, Dark Mode
+            - ✅ Media Download, Auto-reply
             > Requires Android 5.0+
           files: app/build/outputs/apk/debug/SP-WhatsApp-v1.0.${{ github.run_number }}.apk
         env:
