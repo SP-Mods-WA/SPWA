@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string-array name="ua_entries">
+        <item>Desktop (Recommended)</item>
+        <item>Mobile</item>
+    </string-array>
+    <string-array name="ua_values">
+        <item>desktop</item>
+        <item>mobile</item>
+    </string-array>
+</resources>
