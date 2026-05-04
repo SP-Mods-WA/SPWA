@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent" android:layout_height="match_parent"
+    android:background="@color/sp_bg" android:gravity="center"
+    android:orientation="vertical" android:padding="32dp">
+    <ImageView android:layout_width="80dp" android:layout_height="80dp"
+        android:src="@mipmap/ic_launcher" android:layout_marginBottom="16dp"/>
+    <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+        android:text="SP WhatsApp" android:textSize="22sp" android:textStyle="bold"
+        android:textColor="@color/sp_green" android:layout_marginBottom="8dp"/>
+    <TextView android:id="@+id/pinDisplay"
+        android:layout_width="wrap_content" android:layout_height="wrap_content"
+        android:text="○○○○" android:textSize="32sp" android:textColor="@color/white"
+        android:letterSpacing="0.3" android:layout_marginVertical="24dp"/>
+    <GridLayout android:layout_width="280dp" android:layout_height="wrap_content"
+        android:columnCount="3" android:rowCount="4" android:useDefaultMargins="true">
+        <Button android:id="@+id/btn1" android:text="1" style="@style/PinButton"/>
+        <Button android:id="@+id/btn2" android:text="2" style="@style/PinButton"/>
+        <Button android:id="@+id/btn3" android:text="3" style="@style/PinButton"/>
+        <Button android:id="@+id/btn4" android:text="4" style="@style/PinButton"/>
+        <Button android:id="@+id/btn5" android:text="5" style="@style/PinButton"/>
+        <Button android:id="@+id/btn6" android:text="6" style="@style/PinButton"/>
+        <Button android:id="@+id/btn7" android:text="7" style="@style/PinButton"/>
+        <Button android:id="@+id/btn8" android:text="8" style="@style/PinButton"/>
+        <Button android:id="@+id/btn9" android:text="9" style="@style/PinButton"/>
+        <Button android:id="@+id/btnBiometric" android:text="👆" style="@style/PinButton"/>
+        <Button android:id="@+id/btn0" android:text="0" style="@style/PinButton"/>
+        <Button android:id="@+id/btnDel" android:text="⌫" style="@style/PinButton"/>
+    </GridLayout>
+</LinearLayout>
