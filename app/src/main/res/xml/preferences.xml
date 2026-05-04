@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="utf-8"?>
+<PreferenceScreen xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto">
+
+    <PreferenceCategory android:title="Privacy &amp; Security">
+        <SwitchPreferenceCompat
+            app:key="app_lock_enabled"
+            android:title="App Lock"
+            android:summary="Lock app with PIN or fingerprint"/>
+        <SwitchPreferenceCompat
+            app:key="biometric_enabled"
+            android:title="Fingerprint Unlock"
+            android:summary="Use fingerprint to unlock"/>
+    </PreferenceCategory>
+
+    <PreferenceCategory android:title="Messaging">
+        <SwitchPreferenceCompat
+            app:key="auto_reply_enabled"
+            android:title="Auto Reply"
+            android:summary="Send automatic replies when busy"/>
+    </PreferenceCategory>
+
+    <PreferenceCategory android:title="Browser">
+        <ListPreference
+            app:key="user_agent"
+            android:title="User Agent"
+            android:summary="Desktop shows full WhatsApp Web"
+            android:entries="@array/ua_entries"
+            android:entryValues="@array/ua_values"
+            android:defaultValue="desktop"/>
+    </PreferenceCategory>
+
+    <PreferenceCategory android:title="Data">
+        <Preference
+            app:key="clear_all_data"
+            android:title="Clear All Data"
+            android:summary="Logout from all accounts and clear cache"/>
+    </PreferenceCategory>
+
+    <PreferenceCategory android:title="About">
+        <Preference
+            app:key="about"
+            android:title="SP WhatsApp"
+            android:summary="Version 1.0.0 — Enhanced WhatsApp Web Client"/>
+    </PreferenceCategory>
+
+</PreferenceScreen>
