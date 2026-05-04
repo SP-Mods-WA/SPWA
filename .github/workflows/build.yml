@@ -20,15 +20,16 @@ jobs:
         with:
           java-version: '17'
           distribution: 'temurin'
-          cache: gradle
 
       - name: Setup Android SDK
         uses: android-actions/setup-android@v3
 
-      - name: Setup Gradle
-        uses: gradle/actions/setup-gradle@v3
-        with:
-          gradle-version: '8.4'
+      - name: Download Gradle Wrapper JAR
+        run: |
+          mkdir -p gradle/wrapper
+          curl -fL "https://repo.gradle.org/gradle/libs-releases/org/gradle/gradle-wrapper/8.4/gradle-wrapper-8.4.jar" \
+            -o gradle/wrapper/gradle-wrapper.jar
+          ls -lh gradle/wrapper/gradle-wrapper.jar
 
       - name: Make gradlew executable
         run: chmod +x gradlew
@@ -69,24 +70,21 @@ jobs:
             ## SP WhatsApp v1.0.${{ github.run_number }}
             
             ### ✅ Features
-            - WhatsApp Web with custom dark UI
-            - 3 Account support (switch between accounts)
-            - Chat tabs: All / Groups / Unread / Favourites
-            - App Lock with PIN + Fingerprint
-            - DND Mode (disconnect SP WhatsApp only)
+            - WhatsApp Web real client
+            - 3 Account support
+            - Chat tabs (All / Groups / Unread)
+            - App Lock (PIN + Fingerprint)
+            - DND Mode
             - Dark Mode
-            - Media download manager
-            - Auto-reply (settings)
-            - Pull to refresh
-            - Offline page with retry
+            - Media Download
+            - Auto-reply
             
             ### 📱 Install
-            1. Download **SP-WhatsApp-v1.0.${{ github.run_number }}.apk**
-            2. Enable "Install from unknown sources" on your Android
+            1. Download APK below
+            2. Enable "Install from unknown sources"
             3. Install and enjoy!
             
-            > Requires Android 5.0 (Lollipop) or higher
+            > Requires Android 5.0+
           files: app/build/outputs/apk/debug/SP-WhatsApp-v1.0.${{ github.run_number }}.apk
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
