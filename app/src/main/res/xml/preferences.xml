@@ -1,47 +1,32 @@
 <?xml version="1.0" encoding="utf-8"?>
-<PreferenceScreen xmlns:android="http://schemas.android.com/apk/res/android"
-    xmlns:app="http://schemas.android.com/apk/res-auto">
+<PreferenceScreen xmlns:android="http://schemas.android.com/apk/res/android">
 
-    <PreferenceCategory
-        android:title="VPN Settings">
+    <SwitchPreference
+        android:key="vpn_auto_start"
+        android:title="Auto Start VPN"
+        android:summary="App open වෙනකොටම VPN start"
+        android:defaultValue="true"/>
 
-        <SwitchPreferenceCompat
-            app:key="vpn_auto_start"
-            android:title="Auto Start VPN"
-            android:summary="App open වෙනකොටම VPN start කරනවා"
-            android:defaultValue="true"/>
+    <EditTextPreference
+        android:key="vpn_server"
+        android:title="Server Address"
+        android:defaultValue="10.0.0.1"/>
 
-        <EditTextPreference
-            app:key="vpn_server_address"
-            android:title="Server Address"
-            android:summary="VPN server IP හෝ domain"
-            android:defaultValue="10.0.0.1"/>
+    <SwitchPreference
+        android:key="vpn_boot_start"
+        android:title="Start on Boot"
+        android:defaultValue="true"/>
 
-        <EditTextPreference
-            app:key="vpn_server_port"
-            android:title="Server Port"
-            android:summary="Default: 1194"
-            android:defaultValue="1194"/>
+    <SwitchPreference
+        android:key="vpn_kill_switch"
+        android:title="Kill Switch"
+        android:defaultValue="false"/>
 
-        <ListPreference
-            app:key="vpn_protocol"
-            android:title="Protocol"
-            android:entries="@array/vpn_protocols"
-            android:entryValues="@array/vpn_protocol_values"
-            android:defaultValue="udp"/>
-
-        <SwitchPreferenceCompat
-            app:key="vpn_kill_switch"
-            android:title="Kill Switch"
-            android:summary="VPN නැතිව internet block කරනවා"
-            android:defaultValue="false"/>
-
-        <SwitchPreferenceCompat
-            app:key="vpn_boot_start"
-            android:title="Start on Boot"
-            android:summary="Phone restart වෙද්දීත් VPN start කරනවා"
-            android:defaultValue="true"/>
-
-    </PreferenceCategory>
+    <ListPreference
+        android:key="vpn_protocol"
+        android:title="Protocol"
+        android:entries="@array/vpn_protocols"
+        android:entryValues="@array/vpn_protocol_values"
+        android:defaultValue="udp"/>
 
 </PreferenceScreen>
