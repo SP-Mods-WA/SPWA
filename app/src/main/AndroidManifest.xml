@@ -2,16 +2,16 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     package="com.example.myvpn">
 
-    <uses-permission android:name="android.permission.INTERNET" />
-    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
-    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+    <uses-permission android:name="android.permission.INTERNET"/>
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE"/>
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED"/>
 
     <application
-        android:label="MyVPN"
+        android:label="Privacy VPN"
         android:icon="@mipmap/ic_launcher"
         android:theme="@style/AppTheme">
 
-        <!-- App open වෙනකොටම VPN auto-start -->
+        <!-- Auto-start on open -->
         <activity
             android:name=".MainActivity"
             android:exported="true">
@@ -23,22 +23,21 @@
 
         <!-- VPN Service -->
         <service
-            android:name=".MyVpnService"
+            android:name=".PrivacyVpnService"
             android:permission="android.permission.BIND_VPN_SERVICE"
-            android:exported="false">
+            android:exported="false"
+            android:foregroundServiceType="specialUse">
             <intent-filter>
                 <action android:name="android.net.VpnService"/>
             </intent-filter>
         </service>
 
-        <!-- Phone restart වෙද්දීත් auto-start -->
+        <!-- Boot auto-start -->
         <receiver
             android:name=".BootReceiver"
-            android:exported="true"
-            android:enabled="true">
+            android:exported="true">
             <intent-filter>
                 <action android:name="android.intent.action.BOOT_COMPLETED"/>
-                <category android:name="android.intent.category.DEFAULT"/>
             </intent-filter>
         </receiver>
 
