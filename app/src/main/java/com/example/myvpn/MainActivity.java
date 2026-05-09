@@ -56,23 +56,45 @@ public class MainActivity extends Activity {
 
     private void showRealIp() {
         new Thread(() -> {
-            try {
-                // Real IP fetch කරනවා
-                java.net.URL url = new java.net.URL("https://api.ipify.org");
-                java.net.HttpURLConnection conn =
-                    (java.net.HttpURLConnection) url.openConnection();
-                java.io.BufferedReader reader = new java.io.BufferedReader(
-                    new java.io.InputStreamReader(conn.getInputStream()));
-                String realIp = reader.readLine();
-                reader.close();
+            // Multiple IP APIs try කරනවා
+            String[] ipApis = {
+                "https://api4.my-ip.io/ip",
+                "https://ipv4.icanhazip.com",
+                "https://checkip.amazonaws.com",
+                "https://api.ipify.org"
+            };
 
-                runOnUiThread(() -> {
-                    tvIp.setText("Real IP: " + realIp);
-                    tvHiddenIp.setText("Visible IP: 🔒 Hidden");
-                });
-            } catch (Exception e) {
-                runOnUiThread(() -> tvIp.setText("IP: Detecting..."));
+            for (String apiUrl : ipApis) {
+                try {
+                    java.net.URL url = new java.net.URL(apiUrl);
+                    java.net.HttpURLConnection conn =
+                        (java.net.HttpURLConnection) url.openConnection();
+                    conn.setConnectTimeout(5000);
+                    conn.setReadTimeout(5000);
+                    conn.setRequestProperty("User-Agent", "Mozilla/5.0");
+
+                    java.io.BufferedReader reader = new java.io.BufferedReader(
+                        new java.io.InputStreamReader(conn.getInputStream()));
+                    String ip = reader.readLine().trim();
+                    reader.close();
+
+                    if (ip != null && !ip.isEmpty()) {
+                        runOnUiThread(() -> {
+                            tvIp.setText("Real IP: " + ip);
+                            tvHiddenIp.setText("Visible IP: 🔒 Hidden via VPN");
+                        });
+                        return; // Success — stop trying
+                    }
+                } catch (Exception ignored) {
+                    // Next API try කරනවා
+                }
             }
+
+            // සියලු APIs fail වුනා
+            runOnUiThread(() -> {
+                tvIp.setText("Real IP: Unavailable");
+                tvHiddenIp.setText("Visible IP: 🔒 Hidden via VPN");
+            });
         }).start();
     }
 }
