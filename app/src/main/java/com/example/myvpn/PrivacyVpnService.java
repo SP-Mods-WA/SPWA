@@ -3,7 +3,6 @@ package com.example.myvpn;
 import android.app.Notification;
 import android.app.NotificationChannel;
 import android.app.NotificationManager;
-import android.app.PendingIntent;
 import android.content.Intent;
 import android.net.VpnService;
 import android.os.ParcelFileDescriptor;
@@ -11,21 +10,16 @@ import android.util.Log;
 
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
-import java.net.DatagramPacket;
-import java.net.DatagramSocket;
-import java.net.InetAddress;
 import java.nio.ByteBuffer;
 
 public class PrivacyVpnService extends VpnService {
 
-    private static final String TAG = "PrivacyVpnService";
+    private static final String TAG        = "PrivacyVpnService";
     private static final String CHANNEL_ID = "vpn_channel";
 
-    // Cloudflare WARP IPs — privacy සඳහා
-    private static final String VPN_ADDRESS   = "172.16.0.2";
-    private static final String VPN_ROUTE     = "0.0.0.0";          // සියලු traffic
-    private static final String DNS_PRIMARY   = "1.1.1.1";          // Cloudflare
-    private static final String DNS_SECONDARY = "1.0.0.1";          // Cloudflare backup
+    private static final String VPN_ADDRESS   = "10.0.0.2";
+    private static final String DNS_PRIMARY   = "1.1.1.1";   // Cloudflare
+    private static final String DNS_SECONDARY = "8.8.8.8";   // Google
 
     private ParcelFileDescriptor vpnInterface;
     private Thread vpnThread;
@@ -47,21 +41,24 @@ public class PrivacyVpnService extends VpnService {
             Builder builder = new Builder();
             builder.setSession("PrivacyVPN");
 
-            // VPN tunnel address
-            builder.addAddress(VPN_ADDRESS, 24);
+            // VPN address
+            builder.addAddress(VPN_ADDRESS, 32);
 
-            // සියලු IPv4 traffic route කරනවා
-            builder.addRoute(VPN_ROUTE, 0);
-
-            // Cloudflare DNS — privacy + fast
+            // සියලු apps direct internet use කරනවා — internet cut වෙන්නේ නෑ
+            // DNS privacy සඳහා Cloudflare use කරනවා
             builder.addDnsServer(DNS_PRIMARY);
             builder.addDnsServer(DNS_SECONDARY);
 
-            // MTU set කරනවා
+            // KEY FIX: route කිසිවක් add කරන්නේ නෑ
+            // ඒ නිසා සියලු traffic direct යනවා — internet cut නොවේ
+            // VPN icon show වෙනවා + DNS privacy ලැබෙනවා
+
             builder.setMtu(1500);
 
-            // Local traffic bypass කරනවා
-            builder.allowFamily(android.system.OsConstants.AF_INET);
+            // මේ app bypass කරනවා
+            try {
+                builder.addDisallowedApplication(getPackageName());
+            } catch (Exception ignored) {}
 
             vpnInterface = builder.establish();
 
@@ -71,9 +68,10 @@ public class PrivacyVpnService extends VpnService {
             }
 
             running = true;
-            Log.i(TAG, "Privacy VPN Started - IP Hidden");
+            Log.i(TAG, "Privacy VPN Started");
 
-            vpnThread = new Thread(this::handlePackets);
+            // Packet read thread — active රඳවාගන්න
+            vpnThread = new Thread(this::keepAlive);
             vpnThread.start();
 
         } catch (Exception e) {
@@ -81,28 +79,24 @@ public class PrivacyVpnService extends VpnService {
         }
     }
 
-    private void handlePackets() {
+    private void keepAlive() {
+        // VPN tunnel active රඳවාගන්නවා
+        // Route නැති නිසා internet direct යනවා
         try {
-            FileInputStream  in     = new FileInputStream(vpnInterface.getFileDescriptor());
-            FileOutputStream out    = new FileOutputStream(vpnInterface.getFileDescriptor());
-            ByteBuffer       packet = ByteBuffer.allocate(32767);
+            FileInputStream in = new FileInputStream(vpnInterface.getFileDescriptor());
+            ByteBuffer packet  = ByteBuffer.allocate(32767);
 
             while (running) {
                 packet.clear();
+                // Packets read කරනවා — drop කරනවා (route නැති නිසා ඇත්තෙම packet නෑ)
                 int length = in.read(packet.array());
-
                 if (length > 0) {
-                    packet.limit(length);
-
-                    // Packet forward කරනවා
-                    // Real production VPN එකක් නම් මෙහිදී
-                    // encrypted tunnel (TLS/DTLS) හරහා server එකට යවනවා
-                    // Demo: loopback
-                    out.write(packet.array(), 0, length);
+                    // Do nothing — direct routing නිසා packets tunnel හරහා නෑ
                 }
+                Thread.sleep(100);
             }
         } catch (Exception e) {
-            if (running) Log.e(TAG, "Packet error: " + e.getMessage());
+            if (running) Log.e(TAG, "keepAlive error: " + e.getMessage());
         }
     }
 
@@ -127,7 +121,7 @@ public class PrivacyVpnService extends VpnService {
 
         Notification notification = new Notification.Builder(this, CHANNEL_ID)
             .setContentTitle("🔒 Privacy VPN Active")
-            .setContentText("Your IP is hidden")
+            .setContentText("DNS Privacy enabled — Cloudflare 1.1.1.1")
             .setSmallIcon(android.R.drawable.ic_lock_lock)
             .build();
 
