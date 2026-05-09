@@ -7,35 +7,27 @@
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED"/>
 
     <application
-        android:label="Privacy VPN"
+        android:label="WARP VPN"
         android:icon="@mipmap/ic_launcher"
         android:theme="@style/AppTheme">
 
-        <!-- Auto-start on open -->
-        <activity
-            android:name=".MainActivity"
-            android:exported="true">
+        <activity android:name=".MainActivity" android:exported="true">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN"/>
                 <category android:name="android.intent.category.LAUNCHER"/>
             </intent-filter>
         </activity>
 
-        <!-- VPN Service -->
         <service
-            android:name=".PrivacyVpnService"
+            android:name=".WarpVpnService"
             android:permission="android.permission.BIND_VPN_SERVICE"
-            android:exported="false"
-            android:foregroundServiceType="specialUse">
+            android:exported="false">
             <intent-filter>
                 <action android:name="android.net.VpnService"/>
             </intent-filter>
         </service>
 
-        <!-- Boot auto-start -->
-        <receiver
-            android:name=".BootReceiver"
-            android:exported="true">
+        <receiver android:name=".BootReceiver" android:exported="true">
             <intent-filter>
                 <action android:name="android.intent.action.BOOT_COMPLETED"/>
             </intent-filter>
