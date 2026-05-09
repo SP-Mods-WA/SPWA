@@ -7,42 +7,50 @@
     android:background="#0A0E1A"
     android:padding="32dp">
 
-    <!-- App Title -->
     <TextView
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:text="🔒 MyVPN"
-        android:textSize="40sp"
+        android:text="🔒 Privacy VPN"
+        android:textSize="36sp"
         android:textColor="#00D4FF"
         android:textStyle="bold"
-        android:layout_marginBottom="32dp"/>
+        android:layout_marginBottom="24dp"/>
 
-    <!-- VPN Shield Icon (text-based) -->
     <TextView
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:text="🛡️"
         android:textSize="80sp"
-        android:layout_marginBottom="32dp"/>
+        android:layout_marginBottom="24dp"/>
 
-    <!-- Status -->
+    <!-- VPN Status -->
     <TextView
         android:id="@+id/tvStatus"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:text="⏳ Connecting..."
-        android:textSize="22sp"
+        android:text="⏳ Starting..."
+        android:textSize="20sp"
         android:textColor="#FFFFFF"
         android:textStyle="bold"
-        android:layout_marginBottom="16dp"/>
+        android:layout_marginBottom="24dp"/>
 
-    <!-- IP Address -->
+    <!-- Real IP -->
     <TextView
         android:id="@+id/tvIp"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:text="IP: Detecting..."
+        android:text="Real IP: Detecting..."
         android:textSize="14sp"
-        android:textColor="#8899AA"/>
+        android:textColor="#8899AA"
+        android:layout_marginBottom="8dp"/>
+
+    <!-- Hidden IP -->
+    <TextView
+        android:id="@+id/tvHiddenIp"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Visible IP: Checking..."
+        android:textSize="14sp"
+        android:textColor="#00FF88"/>
 
 </LinearLayout>
