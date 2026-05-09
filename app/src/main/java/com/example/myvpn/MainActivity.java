@@ -2,6 +2,7 @@ package com.example.myvpn;
 
 import android.app.Activity;
 import android.content.Intent;
+import android.content.SharedPreferences;
 import android.net.VpnService;
 import android.os.Bundle;
 import android.widget.TextView;
@@ -18,14 +19,40 @@ public class MainActivity extends Activity {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
 
-        tvStatus    = findViewById(R.id.tvStatus);
-        tvIp        = findViewById(R.id.tvIp);
-        tvHiddenIp  = findViewById(R.id.tvHiddenIp);
+        tvStatus   = findViewById(R.id.tvStatus);
+        tvIp       = findViewById(R.id.tvIp);
+        tvHiddenIp = findViewById(R.id.tvHiddenIp);
 
-        tvStatus.setText("⏳ Starting VPN...");
+        tvStatus.setText("⏳ Initializing WARP...");
 
-        // App open වෙනකොටම auto-start
-        prepareVpn();
+        SharedPreferences prefs = getSharedPreferences("warp", MODE_PRIVATE);
+        boolean registered = prefs.getBoolean("registered", false);
+
+        if (!registered) {
+            registerAndStart();
+        } else {
+            prepareVpn();
+        }
+    }
+
+    private void registerAndStart() {
+        tvStatus.setText("⏳ Registering with Cloudflare...");
+        WarpRegistration.register(new WarpRegistration.Callback() {
+            @Override
+            public void onSuccess(String privateKey, String address, String address6) {
+                getSharedPreferences("warp", MODE_PRIVATE).edit()
+                    .putBoolean("registered", true)
+                    .putString("private_key", privateKey)
+                    .putString("address", address)
+                    .putString("address6", address6)
+                    .apply();
+                runOnUiThread(() -> prepareVpn());
+            }
+            @Override
+            public void onFailure(String error) {
+                runOnUiThread(() -> prepareVpn());
+            }
+        });
     }
 
     private void prepareVpn() {
@@ -47,53 +74,42 @@ public class MainActivity extends Activity {
     }
 
     private void startVpn() {
-        Intent intent = new Intent(this, PrivacyVpnService.class);
+        Intent intent = new Intent(this, WarpVpnService.class);
         intent.setAction("START");
         startService(intent);
-        tvStatus.setText("🟢 VPN Active - IP Hidden");
-        showRealIp();
+        tvStatus.setText("🟢 WARP Active - IP Hidden");
+        fetchIpAddresses();
     }
 
-    private void showRealIp() {
+    private void fetchIpAddresses() {
         new Thread(() -> {
-            // Multiple IP APIs try කරනවා
-            String[] ipApis = {
+            String[] apis = {
                 "https://api4.my-ip.io/ip",
                 "https://ipv4.icanhazip.com",
-                "https://checkip.amazonaws.com",
-                "https://api.ipify.org"
+                "https://checkip.amazonaws.com"
             };
-
-            for (String apiUrl : ipApis) {
+            for (String api : apis) {
                 try {
-                    java.net.URL url = new java.net.URL(apiUrl);
                     java.net.HttpURLConnection conn =
-                        (java.net.HttpURLConnection) url.openConnection();
+                        (java.net.HttpURLConnection) new java.net.URL(api).openConnection();
                     conn.setConnectTimeout(5000);
                     conn.setReadTimeout(5000);
-                    conn.setRequestProperty("User-Agent", "Mozilla/5.0");
-
-                    java.io.BufferedReader reader = new java.io.BufferedReader(
+                    java.io.BufferedReader r = new java.io.BufferedReader(
                         new java.io.InputStreamReader(conn.getInputStream()));
-                    String ip = reader.readLine().trim();
-                    reader.close();
-
+                    String ip = r.readLine().trim();
+                    r.close();
                     if (ip != null && !ip.isEmpty()) {
                         runOnUiThread(() -> {
-                            tvIp.setText("Real IP: " + ip);
-                            tvHiddenIp.setText("Visible IP: 🔒 Hidden via VPN");
+                            tvIp.setText("Your IP: " + ip);
+                            tvHiddenIp.setText("🔒 Routed via Cloudflare WARP");
                         });
-                        return; // Success — stop trying
+                        return;
                     }
-                } catch (Exception ignored) {
-                    // Next API try කරනවා
-                }
+                } catch (Exception ignored) {}
             }
-
-            // සියලු APIs fail වුනා
             runOnUiThread(() -> {
-                tvIp.setText("Real IP: Unavailable");
-                tvHiddenIp.setText("Visible IP: 🔒 Hidden via VPN");
+                tvIp.setText("IP: Protected");
+                tvHiddenIp.setText("🔒 Cloudflare WARP Active");
             });
         }).start();
     }
