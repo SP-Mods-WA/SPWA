@@ -2,17 +2,19 @@ package com.example.myvpn;
 
 import android.app.Activity;
 import android.content.Intent;
-import android.content.SharedPreferences;
 import android.net.VpnService;
 import android.os.Bundle;
 import android.widget.TextView;
 
-public class MainActivity extends Activity {
+import ca.psiphon.PsiphonTunnel;
+
+public class MainActivity extends Activity implements PsiphonTunnel.HostService {
 
     private static final int VPN_REQUEST_CODE = 100;
     private TextView tvStatus;
     private TextView tvIp;
     private TextView tvHiddenIp;
+    private PsiphonTunnel psiphonTunnel;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -23,36 +25,10 @@ public class MainActivity extends Activity {
         tvIp       = findViewById(R.id.tvIp);
         tvHiddenIp = findViewById(R.id.tvHiddenIp);
 
-        tvStatus.setText("⏳ Initializing WARP...");
+        tvStatus.setText("⏳ Starting Psiphon...");
 
-        SharedPreferences prefs = getSharedPreferences("warp", MODE_PRIVATE);
-        boolean registered = prefs.getBoolean("registered", false);
-
-        if (!registered) {
-            registerAndStart();
-        } else {
-            prepareVpn();
-        }
-    }
-
-    private void registerAndStart() {
-        tvStatus.setText("⏳ Registering with Cloudflare...");
-        WarpRegistration.register(new WarpRegistration.Callback() {
-            @Override
-            public void onSuccess(String privateKey, String address, String address6) {
-                getSharedPreferences("warp", MODE_PRIVATE).edit()
-                    .putBoolean("registered", true)
-                    .putString("private_key", privateKey)
-                    .putString("address", address)
-                    .putString("address6", address6)
-                    .apply();
-                runOnUiThread(() -> prepareVpn());
-            }
-            @Override
-            public void onFailure(String error) {
-                runOnUiThread(() -> prepareVpn());
-            }
-        });
+        psiphonTunnel = PsiphonTunnel.newPsiphonTunnel(this);
+        prepareVpn();
     }
 
     private void prepareVpn() {
@@ -60,57 +36,145 @@ public class MainActivity extends Activity {
         if (intent != null) {
             startActivityForResult(intent, VPN_REQUEST_CODE);
         } else {
-            startVpn();
+            startPsiphon();
         }
     }
 
     @Override
     protected void onActivityResult(int req, int res, Intent data) {
         if (req == VPN_REQUEST_CODE && res == RESULT_OK) {
-            startVpn();
+            startPsiphon();
         } else {
             tvStatus.setText("❌ Permission Denied");
         }
     }
 
-    private void startVpn() {
-        Intent intent = new Intent(this, WarpVpnService.class);
-        intent.setAction("START");
-        startService(intent);
-        tvStatus.setText("🟢 WARP Active - IP Hidden");
-        fetchIpAddresses();
+    private void startPsiphon() {
+        new Thread(() -> {
+            try {
+                psiphonTunnel.startRouting();
+                runOnUiThread(() -> tvStatus.setText("⏳ Connecting..."));
+            } catch (Exception e) {
+                runOnUiThread(() -> tvStatus.setText("❌ Error: " + e.getMessage()));
+            }
+        }).start();
     }
 
-    private void fetchIpAddresses() {
+    // ── PsiphonTunnel.HostService callbacks ──────────────────────────
+
+    @Override
+    public String getAppName() { return "PrivacyVPN"; }
+
+    @Override
+    public Activity getContext() { return this; }
+
+    @Override
+    public VpnService.Builder newVpnServiceBuilder() {
+        return new VpnService.Builder();
+    }
+
+    @Override
+    public String getPsiphonConfig() {
+        // Psiphon embedded config — account ඕනෑ නෑ
+        return "{}";
+    }
+
+    @Override
+    public void onDiagnosticMessage(String message) {
+        android.util.Log.d("Psiphon", message);
+    }
+
+    @Override
+    public void onAvailableEgressRegions(java.util.List<String> regions) {}
+
+    @Override
+    public void onSocksProxyPortInUse(int port) {}
+
+    @Override
+    public void onHttpProxyPortInUse(int port) {}
+
+    @Override
+    public void onListeningSocksProxyPort(int port) {}
+
+    @Override
+    public void onListeningHttpProxyPort(int port) {}
+
+    @Override
+    public void onUpstreamProxyError(String message) {}
+
+    @Override
+    public void onConnecting() {
+        runOnUiThread(() -> tvStatus.setText("⏳ Connecting..."));
+    }
+
+    @Override
+    public void onConnected() {
+        runOnUiThread(() -> {
+            tvStatus.setText("🟢 Connected - IP Hidden");
+            fetchIp();
+        });
+    }
+
+    @Override
+    public void onHomepage(String url) {}
+
+    @Override
+    public void onClientRegion(String region) {
+        runOnUiThread(() -> tvHiddenIp.setText("🔒 Region: " + region));
+    }
+
+    @Override
+    public void onClientAddress(String address) {
+        runOnUiThread(() -> tvIp.setText("IP: " + address));
+    }
+
+    @Override
+    public void onDisconnected() {
+        runOnUiThread(() -> tvStatus.setText("🔴 Disconnected"));
+    }
+
+    @Override
+    public void onFailedConnectionAttempt() {}
+
+    @Override
+    public void onRequestingUpstreamProxy() {}
+
+    @Override
+    public void onActiveAuthorizationIDs(java.util.List<String> ids) {}
+
+    @Override
+    public void onTrafficRateLimits(long up, long down) {}
+
+    @Override
+    public void onApplicationParameters(Object params) {}
+
+    @Override
+    public void onServerAlert(String reason, String subject,
+                              java.util.List<String> actionURLs) {}
+
+    @Override
+    public void onExiting() {}
+
+    private void fetchIp() {
         new Thread(() -> {
-            String[] apis = {
-                "https://api4.my-ip.io/ip",
-                "https://ipv4.icanhazip.com",
-                "https://checkip.amazonaws.com"
-            };
-            for (String api : apis) {
-                try {
-                    java.net.HttpURLConnection conn =
-                        (java.net.HttpURLConnection) new java.net.URL(api).openConnection();
-                    conn.setConnectTimeout(5000);
-                    conn.setReadTimeout(5000);
-                    java.io.BufferedReader r = new java.io.BufferedReader(
-                        new java.io.InputStreamReader(conn.getInputStream()));
-                    String ip = r.readLine().trim();
-                    r.close();
-                    if (ip != null && !ip.isEmpty()) {
-                        runOnUiThread(() -> {
-                            tvIp.setText("Your IP: " + ip);
-                            tvHiddenIp.setText("🔒 Routed via Cloudflare WARP");
-                        });
-                        return;
-                    }
-                } catch (Exception ignored) {}
-            }
-            runOnUiThread(() -> {
-                tvIp.setText("IP: Protected");
-                tvHiddenIp.setText("🔒 Cloudflare WARP Active");
-            });
+            try {
+                java.net.HttpURLConnection conn =
+                    (java.net.HttpURLConnection) new java.net.URL(
+                        "https://ipv4.icanhazip.com").openConnection();
+                conn.setConnectTimeout(5000);
+                conn.setReadTimeout(5000);
+                java.io.BufferedReader r = new java.io.BufferedReader(
+                    new java.io.InputStreamReader(conn.getInputStream()));
+                String ip = r.readLine().trim();
+                r.close();
+                runOnUiThread(() -> tvIp.setText("IP: " + ip));
+            } catch (Exception ignored) {}
         }).start();
+    }
+
+    @Override
+    protected void onDestroy() {
+        if (psiphonTunnel != null) psiphonTunnel.stop();
+        super.onDestroy();
     }
 }
