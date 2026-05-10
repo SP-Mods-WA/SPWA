@@ -1,18 +1,17 @@
-name: Build SP WhatsApp APK
+name: Build WhatsApp APK
 
 on:
   push:
-    branches: [ main, master ]
-  pull_request:
-    branches: [ main, master ]
+    branches: [main]
   workflow_dispatch:
 
 jobs:
   build:
+    name: 🤖 Build APK
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout code
+      - name: Checkout
         uses: actions/checkout@v4
 
       - name: Set up JDK 17
@@ -20,26 +19,7 @@ jobs:
         with:
           java-version: '17'
           distribution: 'temurin'
-
-      - name: Setup Android SDK
-        uses: android-actions/setup-android@v3
-
-      - name: Install Gradle 8.4 & Generate Wrapper
-        run: |
-          # Install gradle via sdk
-          sdk_dir=$(dirname $(which sdkmanager)) 2>/dev/null || true
-          
-          # Use gradle directly from apt or install manually
-          wget -q https://services.gradle.org/distributions/gradle-8.4-bin.zip -P /tmp
-          unzip -q /tmp/gradle-8.4-bin.zip -d /opt/gradle
-          export PATH="/opt/gradle/gradle-8.4/bin:$PATH"
-          
-          # Generate wrapper jar properly
-          gradle wrapper --gradle-version=8.4 --distribution-type=bin
-          ls -lh gradle/wrapper/
-
-      - name: Make gradlew executable
-        run: chmod +x gradlew
+          cache: gradle
 
       - name: Cache Gradle
         uses: actions/cache@v4
@@ -47,39 +27,36 @@ jobs:
           path: |
             ~/.gradle/caches
             ~/.gradle/wrapper
-          key: ${{ runner.os }}-gradle-${{ hashFiles('**/*.gradle*', '**/gradle-wrapper.properties') }}
-          restore-keys: ${{ runner.os }}-gradle-
+          key: ${{ runner.os }}-gradle-${{ hashFiles('**/*.gradle*') }}
+
+      - name: Make gradlew executable
+        run: chmod +x gradlew
 
       - name: Build Debug APK
-        run: |
-          export PATH="/opt/gradle/gradle-8.4/bin:$PATH"
-          ./gradlew assembleDebug --no-daemon --stacktrace
+        run: ./gradlew assembleDebug
 
-      - name: Rename APK
-        run: |
-          mv app/build/outputs/apk/debug/app-debug.apk \
-             app/build/outputs/apk/debug/SP-WhatsApp-v1.0.${{ github.run_number }}.apk
-
-      - name: Upload APK Artifact
+      - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: SP-WhatsApp-v1.0.${{ github.run_number }}
-          path: app/build/outputs/apk/debug/SP-WhatsApp-v1.0.${{ github.run_number }}.apk
+          name: WhatsApp-v${{ github.run_number }}
+          path: app/build/outputs/apk/debug/app-debug.apk
           retention-days: 60
 
-      - name: Create GitHub Release
-        if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'
-        uses: softprops/action-gh-release@v2
+      - name: Create Release
+        uses: softprops/action-gh-release@v1
         with:
           tag_name: v1.0.${{ github.run_number }}
-          name: "SP WhatsApp v1.0.${{ github.run_number }}"
+          name: "WhatsApp Mobile v1.0.${{ github.run_number }}"
           body: |
-            ## SP WhatsApp v1.0.${{ github.run_number }}
-            - ✅ WhatsApp Web real client
-            - ✅ 3 Account support
-            - ✅ Chat tabs, App Lock, DND, Dark Mode
-            - ✅ Media Download, Auto-reply
-            > Requires Android 5.0+
-          files: app/build/outputs/apk/debug/SP-WhatsApp-v1.0.${{ github.run_number }}.apk
+            ## 📱 WhatsApp Mobile App
+            
+            **Install කරන්නේ කොහොමද:**
+            1. `app-debug.apk` download කරන්න
+            2. Phone Settings → Security → Unknown Sources → ON
+            3. APK tap කරලා install කරන්න
+            4. Open කරන්න → QR scan කරන්න → Done! ✅
+            
+            > WhatsApp Web mobile-optimized version
+          files: app/build/outputs/apk/debug/app-debug.apk
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
