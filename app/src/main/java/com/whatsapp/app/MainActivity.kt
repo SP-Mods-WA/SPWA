@@ -32,11 +32,11 @@ class MainActivity : AppCompatActivity() {
     private val PERMISSION_REQUEST = 100
     private val WHATSAPP_URL = "https://web.whatsapp.com"
 
-    // Android phone user agent — WhatsApp Web mobile view load වෙනවා
+    // Desktop Chrome user agent — WhatsApp Web properly load වෙනවා
     private val USER_AGENT =
-        "Mozilla/5.0 (Linux; Android 14; Pixel 8) " +
+        "Mozilla/5.0 (X11; Linux x86_64) " +
         "AppleWebKit/537.36 (KHTML, like Gecko) " +
-        "Chrome/120.0.0.0 Mobile Safari/537.36"
+        "Chrome/124.0.0.0 Safari/537.36"
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
