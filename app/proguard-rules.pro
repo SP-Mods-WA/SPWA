@@ -1,3 +1,3 @@
--keep class com.spwhatsapp.** { *; }
 -keepattributes *Annotation*
--dontwarn okhttp3.**
+-keep class com.whatsapp.app.** { *; }
+-dontwarn android.webkit.**
