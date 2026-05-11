@@ -8,8 +8,10 @@ import android.webkit.WebSettings
 import android.webkit.CookieManager
 import android.view.KeyEvent
 import androidx.appcompat.app.AppCompatActivity
-import android.view.View
+import android.view.ViewGroup
 import android.widget.ProgressBar
+import android.widget.RelativeLayout
+import android.graphics.Color
 
 class MainActivity : AppCompatActivity() {
 
@@ -18,10 +20,40 @@ class MainActivity : AppCompatActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        setContentView(R.layout.activity_main)
 
-        webView = findViewById(R.id.webView)
-        progressBar = findViewById(R.id.progressBar)
+        // Create main layout programmatically
+        val relativeLayout = RelativeLayout(this)
+        relativeLayout.layoutParams = ViewGroup.LayoutParams(
+            ViewGroup.LayoutParams.MATCH_PARENT,
+            ViewGroup.LayoutParams.MATCH_PARENT
+        )
+
+        // Create WebView
+        webView = WebView(this)
+        val webViewParams = RelativeLayout.LayoutParams(
+            RelativeLayout.LayoutParams.MATCH_PARENT,
+            RelativeLayout.LayoutParams.MATCH_PARENT
+        )
+        webView.layoutParams = webViewParams
+
+        // Create ProgressBar
+        progressBar = ProgressBar(this, null, android.R.attr.progressBarStyleHorizontal)
+        progressBar.max = 100
+        progressBar.setProgressTintList(android.content.res.ColorStateList.valueOf(Color.parseColor("#075E54")))
+        
+        val progressParams = RelativeLayout.LayoutParams(
+            RelativeLayout.LayoutParams.MATCH_PARENT,
+            3
+        )
+        progressParams.addRule(RelativeLayout.ALIGN_PARENT_TOP)
+        progressBar.layoutParams = progressParams
+        progressBar.visibility = android.view.View.GONE
+
+        // Add views to layout
+        relativeLayout.addView(webView)
+        relativeLayout.addView(progressBar)
+        
+        setContentView(relativeLayout)
 
         setupWebView()
         loadWhatsAppWeb()
@@ -33,34 +65,28 @@ class MainActivity : AppCompatActivity() {
         webSettings.domStorageEnabled = true
         webSettings.loadWithOverviewMode = true
         webSettings.useWideViewPort = true
-        webSettings.setSupportZoom(false)  // Zoom support disabled
-        webSettings.builtInZoomControls = false  // Zoom controls disabled
-        webSettings.displayZoomControls = false
+        webSettings.setSupportZoom(false)
+        webSettings.builtInZoomControls = false
         webSettings.cacheMode = WebSettings.LOAD_DEFAULT
         webSettings.allowFileAccess = true
         webSettings.allowContentAccess = true
         webSettings.mixedContentMode = WebSettings.MIXED_CONTENT_ALWAYS_ALLOW
-
-        // Enable database and localStorage
         webSettings.databaseEnabled = true
         webSettings.setAppCacheEnabled(true)
 
-        // For WhatsApp Web to work properly
+        // Cookie management for WhatsApp Web
         CookieManager.getInstance().setAcceptCookie(true)
         CookieManager.getInstance().setAcceptThirdPartyCookies(webView, true)
-
-        webView.webViewClient = WebViewClient()
-        webView.webChromeClient = WebChromeClient()
 
         webView.webViewClient = object : WebViewClient() {
             override fun onPageStarted(view: WebView?, url: String?, favicon: android.graphics.Bitmap?) {
                 super.onPageStarted(view, url, favicon)
-                progressBar.visibility = View.VISIBLE
+                progressBar.visibility = android.view.View.VISIBLE
             }
 
             override fun onPageFinished(view: WebView?, url: String?) {
                 super.onPageFinished(view, url)
-                progressBar.visibility = View.GONE
+                progressBar.visibility = android.view.View.GONE
             }
 
             override fun shouldOverrideUrlLoading(view: WebView?, url: String?): Boolean {
@@ -77,15 +103,15 @@ class MainActivity : AppCompatActivity() {
             override fun onProgressChanged(view: WebView?, newProgress: Int) {
                 super.onProgressChanged(view, newProgress)
                 if (newProgress == 100) {
-                    progressBar.visibility = View.GONE
+                    progressBar.visibility = android.view.View.GONE
                 } else {
-                    progressBar.visibility = View.VISIBLE
+                    progressBar.visibility = android.view.View.VISIBLE
                     progressBar.progress = newProgress
                 }
             }
         }
 
-        // Handle back button to navigate within WebView history
+        // Handle back button for WebView navigation
         webView.setOnKeyListener { _, keyCode, event ->
             if (keyCode == KeyEvent.KEYCODE_BACK && event.action == KeyEvent.ACTION_UP) {
                 if (webView.canGoBack()) {
