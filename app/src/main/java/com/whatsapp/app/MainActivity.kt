@@ -5,11 +5,13 @@ import android.annotation.SuppressLint
 import android.content.pm.PackageManager
 import android.graphics.Bitmap
 import android.graphics.Color
+import android.graphics.drawable.GradientDrawable
 import android.net.ConnectivityManager
 import android.net.NetworkCapabilities
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
+import android.view.Gravity
 import android.view.View
 import android.webkit.*
 import android.widget.*
@@ -26,6 +28,11 @@ class MainActivity : AppCompatActivity() {
     private lateinit var splashView: FrameLayout
     private lateinit var splashStatusText: TextView
     private lateinit var splashDots: TextView
+
+    // Native QR overlay (drawn on top of WebView)
+    private var qrOverlay: FrameLayout? = null
+    private lateinit var rootLayout: FrameLayout
+
     private var pageLoaded = false
     private val handler = Handler(Looper.getMainLooper())
 
@@ -68,11 +75,11 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+    private fun dp(value: Int) = (value * resources.displayMetrics.density).toInt()
+
     @SuppressLint("SetJavaScriptEnabled")
     private fun setupUI() {
-        val root = FrameLayout(this).apply {
-            setBackgroundColor(Color.WHITE)
-        }
+        rootLayout = FrameLayout(this).apply { setBackgroundColor(Color.WHITE) }
 
         webView = WebView(this).apply {
             settings.apply {
@@ -100,112 +107,254 @@ class MainActivity : AppCompatActivity() {
         }
 
         progressBar = ProgressBar(this, null, android.R.attr.progressBarStyleHorizontal).apply {
-            max = 100
-            visibility = View.GONE
+            max = 100; visibility = View.GONE
         }
 
-        errorView = buildErrorView()
-        splashView = buildSplashView()
+        errorView   = buildErrorView()
+        splashView  = buildSplashView()
 
-        root.addView(webView, FrameLayout.LayoutParams(
-            FrameLayout.LayoutParams.MATCH_PARENT,
-            FrameLayout.LayoutParams.MATCH_PARENT))
-        root.addView(progressBar, FrameLayout.LayoutParams(
+        rootLayout.addView(webView, FrameLayout.LayoutParams(
+            FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT))
+        rootLayout.addView(progressBar, FrameLayout.LayoutParams(
             FrameLayout.LayoutParams.MATCH_PARENT, 8))
-        root.addView(errorView, FrameLayout.LayoutParams(
-            FrameLayout.LayoutParams.MATCH_PARENT,
-            FrameLayout.LayoutParams.MATCH_PARENT))
-        root.addView(splashView, FrameLayout.LayoutParams(
-            FrameLayout.LayoutParams.MATCH_PARENT,
-            FrameLayout.LayoutParams.MATCH_PARENT))
+        rootLayout.addView(errorView, FrameLayout.LayoutParams(
+            FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT))
+        rootLayout.addView(splashView, FrameLayout.LayoutParams(
+            FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT))
 
-        setContentView(root)
+        setContentView(rootLayout)
     }
 
-    private fun dpToPx(dp: Int): Int =
-        (dp * resources.displayMetrics.density).toInt()
+    // ── Native Android QR overlay ───────────────────────────────────────────
+    // WhatsApp Web JS block කරනවා නිසා JS inject වෙන්නේ නැහැ.
+    // ඒ නිසා WebView scroll position detect කරලා QR page එකට
+    // native Android view overlay කරනවා.
+    private fun showQROverlay() {
+        if (qrOverlay != null) return
+
+        val overlay = FrameLayout(this).apply {
+            setBackgroundColor(Color.WHITE)
+        }
+
+        val scrollable = ScrollView(this).apply {
+            isVerticalScrollBarEnabled = false
+            overScrollMode = View.OVER_SCROLL_NEVER
+        }
+
+        val container = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            gravity = Gravity.TOP or Gravity.CENTER_HORIZONTAL
+            setBackgroundColor(Color.WHITE)
+        }
+
+        // ── Green header ──────────────────────────────────────────
+        val header = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            gravity = Gravity.CENTER
+            setBackgroundColor(Color.parseColor("#075E54"))
+            setPadding(0, dp(52), 0, dp(24))
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT)
+        }
+        header.addView(TextView(this).apply {
+            text = "WhatsApp"
+            textSize = 22f
+            setTextColor(Color.WHITE)
+            typeface = android.graphics.Typeface.DEFAULT_BOLD
+        })
+        container.addView(header)
+
+        // ── Body content ──────────────────────────────────────────
+        val body = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            gravity = Gravity.CENTER_HORIZONTAL
+            setPadding(dp(24), dp(32), dp(24), dp(16))
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT)
+        }
+
+        body.addView(TextView(this).apply {
+            text = "Log in to WhatsApp"
+            textSize = 22f
+            setTextColor(Color.parseColor("#111111"))
+            typeface = android.graphics.Typeface.DEFAULT_BOLD
+            gravity = Gravity.CENTER
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT).also {
+                it.bottomMargin = dp(8)
+            }
+        })
+
+        body.addView(TextView(this).apply {
+            text = "Open WhatsApp on your phone\nand scan the QR code"
+            textSize = 14f
+            setTextColor(Color.parseColor("#667781"))
+            gravity = Gravity.CENTER
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT).also {
+                it.bottomMargin = dp(28)
+            }
+        })
+
+        // QR placeholder card — WebView QR area visible කරන window
+        // (transparent hole strategy — WebView behind, overlay above except hole)
+        // Simple approach: just show instructions + phone number button
+        // and let WebView QR show through a transparent region
+
+        // QR area — transparent so WebView QR shows through
+        val qrCard = FrameLayout(this).apply {
+            setBackgroundColor(Color.TRANSPARENT)
+            layoutParams = LinearLayout.LayoutParams(dp(256), dp(256)).also {
+                it.gravity = Gravity.CENTER_HORIZONTAL
+                it.bottomMargin = dp(24)
+            }
+        }
+        body.addView(qrCard)
+        container.addView(body)
+
+        // ── Phone number button ───────────────────────────────────
+        val btnContainer = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            gravity = Gravity.CENTER_HORIZONTAL
+            setPadding(dp(24), 0, dp(24), dp(16))
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT)
+        }
+
+        val phoneBtn = TextView(this).apply {
+            text = "📱  Link with phone number"
+            textSize = 16f
+            setTextColor(Color.WHITE)
+            typeface = android.graphics.Typeface.DEFAULT_BOLD
+            gravity = Gravity.CENTER
+            setPadding(dp(24), dp(16), dp(24), dp(16))
+            background = GradientDrawable().apply {
+                setColor(Color.parseColor("#25D366"))
+                cornerRadius = dp(28).toFloat()
+            }
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT).also {
+                it.bottomMargin = dp(16)
+            }
+            // Click forward to WebView's phone number button via JS
+            setOnClickListener {
+                webView.evaluateJavascript(
+                    "document.querySelector('[data-testid=\"link-device-phone-number-method-button\"]')?.click();",
+                    null
+                )
+                // Remove overlay so WebView phone login page shows
+                removeQROverlay()
+            }
+        }
+        btnContainer.addView(phoneBtn)
+
+        btnContainer.addView(TextView(this).apply {
+            text = "🔒  End-to-end encrypted"
+            textSize = 12f
+            setTextColor(Color.parseColor("#AAAAAA"))
+            gravity = Gravity.CENTER
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT).also {
+                it.bottomMargin = dp(32)
+            }
+        })
+        container.addView(btnContainer)
+
+        scrollable.addView(container, FrameLayout.LayoutParams(
+            FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT))
+        overlay.addView(scrollable, FrameLayout.LayoutParams(
+            FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT))
+
+        qrOverlay = overlay
+        rootLayout.addView(overlay, FrameLayout.LayoutParams(
+            FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT))
+    }
+
+    private fun removeQROverlay() {
+        qrOverlay?.let {
+            rootLayout.removeView(it)
+            qrOverlay = null
+        }
+    }
+
+    // Detect QR page vs chat page from URL/title
+    private fun isQRPage(url: String): Boolean {
+        return url.contains("web.whatsapp.com") &&
+               !url.contains("/app") &&
+               url == "https://web.whatsapp.com/" || url == "https://web.whatsapp.com"
+    }
+
+    // ── Splash ─────────────────────────────────────────────────────────────
 
     private fun buildSplashView(): FrameLayout {
         return FrameLayout(this).apply {
             setBackgroundColor(Color.parseColor("#075E54"))
 
-            val centerLayout = LinearLayout(this@MainActivity).apply {
+            val center = LinearLayout(this@MainActivity).apply {
                 orientation = LinearLayout.VERTICAL
-                gravity = android.view.Gravity.CENTER
+                gravity = Gravity.CENTER
 
-                val iconBg = FrameLayout(this@MainActivity).apply {
-                    val size = dpToPx(90)
+                addView(FrameLayout(this@MainActivity).apply {
+                    val size = dp(90)
                     layoutParams = LinearLayout.LayoutParams(size, size).also {
-                        it.gravity = android.view.Gravity.CENTER_HORIZONTAL
-                        it.bottomMargin = dpToPx(20)
+                        it.gravity = Gravity.CENTER_HORIZONTAL
+                        it.bottomMargin = dp(20)
                     }
-                    background = android.graphics.drawable.GradientDrawable().apply {
-                        shape = android.graphics.drawable.GradientDrawable.OVAL
+                    background = GradientDrawable().apply {
+                        shape = GradientDrawable.OVAL
                         setColor(Color.parseColor("#128C7E"))
                     }
                     addView(TextView(this@MainActivity).apply {
                         text = "✉"
                         textSize = 40f
                         setTextColor(Color.WHITE)
-                        gravity = android.view.Gravity.CENTER
+                        gravity = Gravity.CENTER
                         layoutParams = FrameLayout.LayoutParams(
                             FrameLayout.LayoutParams.MATCH_PARENT,
                             FrameLayout.LayoutParams.MATCH_PARENT)
                     })
-                }
-                addView(iconBg)
+                })
 
                 addView(TextView(this@MainActivity).apply {
                     text = "WhatsApp"
                     textSize = 30f
                     setTextColor(Color.WHITE)
                     typeface = android.graphics.Typeface.DEFAULT_BOLD
-                    gravity = android.view.Gravity.CENTER
-                    setPadding(0, 0, 0, dpToPx(8))
+                    gravity = Gravity.CENTER
+                    setPadding(0, 0, 0, dp(8))
                 })
 
                 splashStatusText = TextView(this@MainActivity).apply {
                     text = "Loading your chats"
                     textSize = 15f
                     setTextColor(Color.parseColor("#B2DFDB"))
-                    gravity = android.view.Gravity.CENTER
+                    gravity = Gravity.CENTER
                 }
                 addView(splashStatusText)
 
-                val dotsRow = LinearLayout(this@MainActivity).apply {
-                    orientation = LinearLayout.HORIZONTAL
-                    gravity = android.view.Gravity.CENTER
-                }
                 splashDots = TextView(this@MainActivity).apply {
                     text = ""
                     textSize = 15f
                     setTextColor(Color.parseColor("#B2DFDB"))
-                    gravity = android.view.Gravity.CENTER
+                    gravity = Gravity.CENTER
                 }
-                dotsRow.addView(splashDots)
-                addView(dotsRow)
+                addView(splashDots)
             }
 
-            addView(centerLayout, FrameLayout.LayoutParams(
+            addView(center, FrameLayout.LayoutParams(
                 FrameLayout.LayoutParams.MATCH_PARENT,
-                FrameLayout.LayoutParams.MATCH_PARENT).also {
-                it.gravity = android.view.Gravity.CENTER
-            })
+                FrameLayout.LayoutParams.MATCH_PARENT).also { it.gravity = Gravity.CENTER })
 
-            addView(LinearLayout(this@MainActivity).apply {
-                orientation = LinearLayout.VERTICAL
-                gravity = android.view.Gravity.CENTER
-                setPadding(0, 0, 0, dpToPx(48))
-                addView(TextView(this@MainActivity).apply {
-                    text = "🔒  End-to-end encrypted"
-                    textSize = 12f
-                    setTextColor(Color.parseColor("#80CBC4"))
-                    gravity = android.view.Gravity.CENTER
-                })
+            addView(TextView(this@MainActivity).apply {
+                text = "🔒  End-to-end encrypted"
+                textSize = 12f
+                setTextColor(Color.parseColor("#80CBC4"))
+                gravity = Gravity.CENTER
+                setPadding(0, 0, 0, dp(48))
             }, FrameLayout.LayoutParams(
                 FrameLayout.LayoutParams.MATCH_PARENT,
                 FrameLayout.LayoutParams.WRAP_CONTENT).also {
-                it.gravity = android.view.Gravity.BOTTOM or android.view.Gravity.CENTER_HORIZONTAL
+                it.gravity = Gravity.BOTTOM or Gravity.CENTER_HORIZONTAL
             })
         }
     }
@@ -213,44 +362,37 @@ class MainActivity : AppCompatActivity() {
     private fun hideSplash() {
         handler.removeCallbacks(dotsRunnable)
         if (splashView.visibility == View.GONE) return
-        splashView.animate()
-            .alpha(0f).setDuration(400)
-            .withEndAction { splashView.visibility = View.GONE; splashView.alpha = 1f }
-            .start()
+        splashView.animate().alpha(0f).setDuration(400)
+            .withEndAction { splashView.visibility = View.GONE; splashView.alpha = 1f }.start()
     }
 
     private fun buildErrorView(): LinearLayout {
         return LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            gravity = android.view.Gravity.CENTER
+            gravity = Gravity.CENTER
             setBackgroundColor(Color.parseColor("#075E54"))
             visibility = View.GONE
-            setPadding(dpToPx(32), dpToPx(32), dpToPx(32), dpToPx(32))
+            setPadding(dp(32), dp(32), dp(32), dp(32))
 
             addView(TextView(this@MainActivity).apply {
-                text = "📵"; textSize = 64f
-                gravity = android.view.Gravity.CENTER
+                text = "📵"; textSize = 64f; gravity = Gravity.CENTER
             })
             addView(TextView(this@MainActivity).apply {
                 text = "Internet සම්බන්ධතාව නැත"
-                textSize = 18f; setTextColor(Color.WHITE)
-                gravity = android.view.Gravity.CENTER
-                setPadding(0, dpToPx(16), 0, dpToPx(8))
+                textSize = 18f; setTextColor(Color.WHITE); gravity = Gravity.CENTER
+                setPadding(0, dp(16), 0, dp(8))
             })
             addView(TextView(this@MainActivity).apply {
                 text = "WiFi හෝ Mobile Data on කරන්න"
-                textSize = 13f; setTextColor(Color.parseColor("#B2DFDB"))
-                gravity = android.view.Gravity.CENTER
+                textSize = 13f; setTextColor(Color.parseColor("#B2DFDB")); gravity = Gravity.CENTER
             })
-            addView(android.widget.Button(this@MainActivity).apply {
+            addView(Button(this@MainActivity).apply {
                 text = "නැවත උත්සාහ කරන්න"
-                setBackgroundColor(Color.parseColor("#25D366"))
-                setTextColor(Color.WHITE)
-                setPadding(dpToPx(32), dpToPx(16), dpToPx(32), dpToPx(16))
+                setBackgroundColor(Color.parseColor("#25D366")); setTextColor(Color.WHITE)
                 layoutParams = LinearLayout.LayoutParams(
                     LinearLayout.LayoutParams.WRAP_CONTENT,
                     LinearLayout.LayoutParams.WRAP_CONTENT
-                ).also { it.topMargin = dpToPx(24); it.gravity = android.view.Gravity.CENTER_HORIZONTAL }
+                ).also { it.topMargin = dp(24); it.gravity = Gravity.CENTER_HORIZONTAL }
                 setOnClickListener { errorView.visibility = View.GONE; loadWhatsApp() }
             })
         }
@@ -276,6 +418,8 @@ class MainActivity : AppCompatActivity() {
         return caps.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)
     }
 
+    // ── WebView Clients ─────────────────────────────────────────────────────
+
     inner class WhatsAppWebViewClient : WebViewClient() {
 
         override fun onPageStarted(view: WebView, url: String, favicon: Bitmap?) {
@@ -286,116 +430,46 @@ class MainActivity : AppCompatActivity() {
         override fun onPageFinished(view: WebView, url: String) {
             progressBar.visibility = View.GONE
             CookieManager.getInstance().flush()
-            injectUI(view)
+
+            // Base CSS inject — viewport + scrollbar
+            view.evaluateJavascript("""
+                (function(){
+                    var m=document.querySelector('meta[name=viewport]');
+                    if(m) m.setAttribute('content',
+                        'width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no');
+                    if(!document.getElementById('wa-base')){
+                        var s=document.createElement('style');
+                        s.id='wa-base';
+                        s.textContent='::-webkit-scrollbar{display:none!important}'+
+                        'body{overflow-x:hidden!important;overscroll-behavior:none!important;}'+
+                        '*{-webkit-tap-highlight-color:transparent!important}';
+                        document.head.appendChild(s);
+                    }
+                })();
+            """.trimIndent(), null)
+
+            // QR page detect — show native overlay
+            handler.postDelayed({
+                view.evaluateJavascript("""
+                    (function(){
+                        var qr = document.querySelector('canvas[aria-label="Scan me!"]')
+                            || document.querySelector('[data-testid="qrcode"] canvas');
+                        var phone = document.querySelector('[data-testid="link-device-phone-number-method-button"]');
+                        return (qr || phone) ? 'qr' : 'chat';
+                    })();
+                """.trimIndent()) { result ->
+                    if (result?.contains("qr") == true) {
+                        showQROverlay()
+                    } else {
+                        removeQROverlay()
+                    }
+                }
+            }, 800)
+
             if (!pageLoaded) {
                 pageLoaded = true
                 handler.postDelayed({ hideSplash() }, 1200)
             }
-        }
-
-        private fun injectUI(view: WebView) {
-            val js = """
-                (function tryInject() {
-                    var meta = document.querySelector('meta[name=viewport]');
-                    if(meta) meta.setAttribute('content',
-                        'width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no');
-
-                    if(!document.getElementById('wa-base-style')) {
-                        var s = document.createElement('style');
-                        s.id = 'wa-base-style';
-                        s.textContent =
-                            '::-webkit-scrollbar{display:none!important}' +
-                            'body{overflow-x:hidden!important;overscroll-behavior:none!important;margin:0!important;padding:0!important;}' +
-                            '*{-webkit-tap-highlight-color:transparent!important;box-sizing:border-box!important}';
-                        document.head.appendChild(s);
-                    }
-
-                    if(document.getElementById('wa-native-ui')) return;
-
-                    var qrCanvas = document.querySelector('canvas[aria-label="Scan me!"]')
-                        || document.querySelector('[data-testid="qrcode"] canvas');
-                    var phoneBtn = document.querySelector('[data-testid="link-device-phone-number-method-button"]');
-
-                    if(!qrCanvas && !phoneBtn) { setTimeout(tryInject, 600); return; }
-
-                    var ui = document.createElement('div');
-                    ui.id = 'wa-native-ui';
-                    Object.assign(ui.style, {
-                        position:'fixed', top:'0', left:'0', width:'100vw', height:'100vh',
-                        background:'#fff', display:'flex', flexDirection:'column',
-                        alignItems:'center', zIndex:'99999', overflowY:'auto', overflowX:'hidden'
-                    });
-
-                    var header = document.createElement('div');
-                    Object.assign(header.style, {
-                        width:'100%', background:'#075E54',
-                        padding:'48px 20px 20px', textAlign:'center', flexShrink:'0'
-                    });
-                    header.innerHTML = '<span style="color:#fff;font-size:22px;font-weight:700;">WhatsApp</span>';
-                    ui.appendChild(header);
-
-                    var content = document.createElement('div');
-                    Object.assign(content.style, {
-                        display:'flex', flexDirection:'column', alignItems:'center',
-                        padding:'28px 24px 0', width:'100%'
-                    });
-
-                    var h1 = document.createElement('div');
-                    Object.assign(h1.style, { fontSize:'20px', fontWeight:'700', color:'#111', marginBottom:'8px', textAlign:'center' });
-                    h1.textContent = 'Log in to WhatsApp';
-                    content.appendChild(h1);
-
-                    var sub = document.createElement('div');
-                    Object.assign(sub.style, { fontSize:'14px', color:'#667781', textAlign:'center', marginBottom:'24px', lineHeight:'1.5' });
-                    sub.textContent = 'Scan the QR code with your phone';
-                    content.appendChild(sub);
-
-                    if(qrCanvas) {
-                        var qrWrap = document.createElement('div');
-                        qrWrap.id = 'wa-qr-box';
-                        Object.assign(qrWrap.style, {
-                            background:'#fff', borderRadius:'20px', padding:'16px',
-                            marginBottom:'24px', boxShadow:'0 2px 20px rgba(0,0,0,0.12)'
-                        });
-                        Object.assign(qrCanvas.style, { width:'220px', height:'220px', display:'block', borderRadius:'8px' });
-                        qrWrap.appendChild(qrCanvas);
-                        content.appendChild(qrWrap);
-                    }
-
-                    ui.appendChild(content);
-
-                    var btn = document.createElement('button');
-                    Object.assign(btn.style, {
-                        width:'calc(100% - 48px)', maxWidth:'380px', padding:'16px 24px',
-                        background:'#25D366', color:'#fff', border:'none', borderRadius:'28px',
-                        fontSize:'16px', fontWeight:'700', cursor:'pointer',
-                        margin:'0 24px 16px', display:'block', textAlign:'center'
-                    });
-                    btn.textContent = 'Link with phone number';
-                    if(phoneBtn) btn.onclick = function(){ phoneBtn.click(); };
-                    ui.appendChild(btn);
-
-                    var footer = document.createElement('div');
-                    Object.assign(footer.style, { color:'#aaa', fontSize:'12px', textAlign:'center', padding:'8px 0 36px' });
-                    footer.textContent = 'End-to-end encrypted';
-                    ui.appendChild(footer);
-
-                    document.body.appendChild(ui);
-
-                    setInterval(function(){
-                        var box = document.getElementById('wa-qr-box');
-                        if(!box) return;
-                        var newCanvas = document.querySelector('canvas[aria-label="Scan me!"]');
-                        if(newCanvas && !box.contains(newCanvas)){
-                            box.innerHTML = '';
-                            Object.assign(newCanvas.style, { width:'220px', height:'220px', display:'block', borderRadius:'8px' });
-                            box.appendChild(newCanvas);
-                        }
-                    }, 1000);
-                })();
-            """.trimIndent()
-            view.evaluateJavascript(js, null)
-            handler.postDelayed({ view.evaluateJavascript(js, null) }, 1500)
         }
 
         override fun onReceivedError(view: WebView, request: WebResourceRequest, error: WebResourceError) {
@@ -404,7 +478,10 @@ class MainActivity : AppCompatActivity() {
 
         override fun shouldOverrideUrlLoading(view: WebView, request: WebResourceRequest): Boolean {
             val url = request.url.toString()
-            return !(url.contains("whatsapp.com") || url.contains("wa.me"))
+            // Remove QR overlay when navigating away from QR page
+            if (!url.contains("web.whatsapp.com")) return true
+            removeQROverlay()
+            return false
         }
     }
 
@@ -413,21 +490,13 @@ class MainActivity : AppCompatActivity() {
             progressBar.progress = newProgress
             if (newProgress == 100) progressBar.visibility = View.GONE
         }
-        override fun onPermissionRequest(request: PermissionRequest) {
-            request.grant(request.resources)
-        }
+        override fun onPermissionRequest(request: PermissionRequest) { request.grant(request.resources) }
 
         private var fileCallback: ValueCallback<Array<android.net.Uri>>? = null
-        override fun onShowFileChooser(
-            webView: WebView,
-            filePathCallback: ValueCallback<Array<android.net.Uri>>,
-            fileChooserParams: FileChooserParams
-        ): Boolean {
+        override fun onShowFileChooser(webView: WebView, filePathCallback: ValueCallback<Array<android.net.Uri>>, fileChooserParams: FileChooserParams): Boolean {
             fileCallback = filePathCallback
-            return try {
-                startActivityForResult(fileChooserParams.createIntent(), FILE_CHOOSER_REQUEST)
-                true
-            } catch (e: Exception) { fileCallback = null; false }
+            return try { startActivityForResult(fileChooserParams.createIntent(), FILE_CHOOSER_REQUEST); true }
+            catch (e: Exception) { fileCallback = null; false }
         }
         fun getFileCallback() = fileCallback
         fun clearFileCallback() { fileCallback = null }
@@ -437,43 +506,26 @@ class MainActivity : AppCompatActivity() {
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: android.content.Intent?) {
         super.onActivityResult(requestCode, resultCode, data)
         if (requestCode == FILE_CHOOSER_REQUEST) {
-            val client = webView.webChromeClient as? WhatsAppChromeClient
-            client?.getFileCallback()?.onReceiveValue(
-                WebChromeClient.FileChooserParams.parseResult(resultCode, data))
-            client?.clearFileCallback()
+            val c = webView.webChromeClient as? WhatsAppChromeClient
+            c?.getFileCallback()?.onReceiveValue(WebChromeClient.FileChooserParams.parseResult(resultCode, data))
+            c?.clearFileCallback()
         }
     }
 
     private fun requestPermissions() {
-        val perms = arrayOf(
-            Manifest.permission.CAMERA,
-            Manifest.permission.RECORD_AUDIO,
-            Manifest.permission.READ_MEDIA_IMAGES,
-            Manifest.permission.READ_MEDIA_VIDEO)
-        val denied = perms.filter {
-            ContextCompat.checkSelfPermission(this, it) != PackageManager.PERMISSION_GRANTED }
-        if (denied.isNotEmpty())
-            ActivityCompat.requestPermissions(this, denied.toTypedArray(), PERMISSION_REQUEST)
+        val perms = arrayOf(Manifest.permission.CAMERA, Manifest.permission.RECORD_AUDIO,
+            Manifest.permission.READ_MEDIA_IMAGES, Manifest.permission.READ_MEDIA_VIDEO)
+        val denied = perms.filter { ContextCompat.checkSelfPermission(this, it) != PackageManager.PERMISSION_GRANTED }
+        if (denied.isNotEmpty()) ActivityCompat.requestPermissions(this, denied.toTypedArray(), PERMISSION_REQUEST)
     }
 
     @Deprecated("Deprecated in Java")
-    override fun onBackPressed() {
-        if (webView.canGoBack()) webView.goBack() else super.onBackPressed()
-    }
+    override fun onBackPressed() { if (webView.canGoBack()) webView.goBack() else super.onBackPressed() }
 
-    override fun onSaveInstanceState(outState: Bundle) {
-        super.onSaveInstanceState(outState)
-        webView.saveState(outState)
-    }
-
+    override fun onSaveInstanceState(outState: Bundle) { super.onSaveInstanceState(outState); webView.saveState(outState) }
     override fun onResume()  { super.onResume();  webView.onResume() }
     override fun onPause()   { super.onPause();   webView.onPause(); CookieManager.getInstance().flush() }
-    override fun onDestroy() {
-        handler.removeCallbacksAndMessages(null)
-        CookieManager.getInstance().flush()
-        webView.destroy()
-        super.onDestroy()
-    }
+    override fun onDestroy() { handler.removeCallbacksAndMessages(null); CookieManager.getInstance().flush(); webView.destroy(); super.onDestroy() }
 
     companion object { private const val FILE_CHOOSER_REQUEST = 1001 }
 }
