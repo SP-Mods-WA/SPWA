@@ -39,7 +39,7 @@ class MainActivity : AppCompatActivity() {
         // Create ProgressBar
         progressBar = ProgressBar(this, null, android.R.attr.progressBarStyleHorizontal)
         progressBar.max = 100
-        progressBar.setProgressTintList(android.content.res.ColorStateList.valueOf(Color.parseColor("#075E54")))
+        progressBar.progressTintList = android.content.res.ColorStateList.valueOf(Color.parseColor("#075E54"))
         
         val progressParams = RelativeLayout.LayoutParams(
             RelativeLayout.LayoutParams.MATCH_PARENT,
@@ -72,7 +72,7 @@ class MainActivity : AppCompatActivity() {
         webSettings.allowContentAccess = true
         webSettings.mixedContentMode = WebSettings.MIXED_CONTENT_ALWAYS_ALLOW
         webSettings.databaseEnabled = true
-        webSettings.setAppCacheEnabled(true)
+        // Note: setAppCacheEnabled is removed in latest Android - do not use
 
         // Cookie management for WhatsApp Web
         CookieManager.getInstance().setAcceptCookie(true)
