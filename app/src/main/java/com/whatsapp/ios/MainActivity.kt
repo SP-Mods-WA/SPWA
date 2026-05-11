@@ -30,11 +30,12 @@ class MainActivity : AppCompatActivity() {
 
     private val URL = "https://web.whatsapp.com"
 
-    // ─── Android WhatsApp Web User Agent (matches screenshot - GBWhatsApp style)
+    // ─── Desktop Chrome UA → web.whatsapp.com loads directly (no QR/grey screen)
+    // CSS injection below makes it look like Android WhatsApp
     private val USER_AGENT =
-        "Mozilla/5.0 (Linux; Android 13; Pixel 7) " +
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) " +
         "AppleWebKit/537.36 (KHTML, like Gecko) " +
-        "Chrome/120.0.0.0 Mobile Safari/537.36"
+        "Chrome/120.0.0.0 Safari/537.36"
 
     // ─── Colors matching the screenshot exactly
     private val COLOR_GREEN        = "#25D366"   // WhatsApp green (header title)
@@ -292,63 +293,69 @@ class MainActivity : AppCompatActivity() {
         val antiDelete    = prefs.getBoolean("anti_delete",  true)
         val hideBlueCheck = prefs.getBoolean("hide_blue",    false)
 
-        // Inject CSS to make web.whatsapp.com look like the Android app screenshot
+        // Inject CSS — desktop WhatsApp Web → Android mobile look
         val css = """
-            /* Hide WhatsApp Web desktop chrome */
-            ._aigs, ._aigw { display:none!important; }
+            /* LAYOUT: show only chat list panel, full width */
+            #app > div > div > div:nth-child(2) { display:none!important; }
+            #pane-side {
+                width:100vw!important;
+                max-width:100vw!important;
+                flex:1!important;
+            }
+            /* Hide QR / intro screen */
+            [data-testid="intro-md-beta-logo-dark"],
+            [data-testid="default-user"] { display:none!important; }
 
-            /* Header: white bg, green title */
-            header, [data-testid="chatlist-header"] {
+            /* HEADER: white */
+            [data-testid="chatlist-header"], header {
                 background:#FFFFFF!important;
-                box-shadow: 0 1px 3px rgba(0,0,0,0.12)!important;
+                box-shadow:0 1px 2px rgba(0,0,0,0.10)!important;
             }
 
-            /* Chat list background */
-            #pane-side, [data-testid="chat-list"] {
-                background:#F0F2F5!important;
-            }
+            /* BACKGROUND */
+            #pane-side, body, #app { background:#F0F2F5!important; }
 
-            /* Chat list item */
+            /* CHAT ITEMS */
             [data-testid="cell-frame-container"] {
                 background:#FFFFFF!important;
                 border-bottom:1px solid #E9EDEF!important;
             }
-            [data-testid="cell-frame-container"]:active {
-                background:#F5F6F6!important;
-            }
+            [data-testid="cell-frame-container"]:hover { background:#F5F6F6!important; }
 
-            /* Unread badge — green */
-            [data-testid="icon-unread-count"] span,
-            .x1sxyh0 .x6s0dn4 span {
+            /* UNREAD BADGE green */
+            [data-testid="icon-unread-count"] {
                 background:#25D366!important;
                 color:#fff!important;
-                font-size:11px!important;
+                border-radius:10px!important;
                 min-width:20px!important;
                 height:20px!important;
-                border-radius:10px!important;
+                font-size:11px!important;
             }
 
-            /* Search bar */
+            /* SEARCH BAR */
             [data-testid="search-bar-input-container"] {
                 background:#F0F2F5!important;
                 border-radius:8px!important;
-                margin:8px 12px!important;
+                margin:6px 10px!important;
             }
 
-            /* Filter chips (All / Unread / Favorites / Groups) */
-            [data-testid="filter-tab-active"] {
+            /* FILTER CHIPS */
+            [aria-selected="true"] {
                 background:#D9FDD3!important;
                 color:#25D366!important;
-                border:none!important;
                 border-radius:16px!important;
             }
 
-            /* Scrollbar */
+            /* SCROLLBAR */
             ::-webkit-scrollbar { width:3px; }
             ::-webkit-scrollbar-thumb { background:#25D366; border-radius:3px; }
 
-            /* Double-tick colour */
+            /* DOUBLE TICK blue */
             [data-testid="msg-dblcheck"] { color:#53BDEB!important; }
+
+            /* CHAT BUBBLES */
+            .message-out .copyable-text { background:#D9FDD3!important; border-radius:8px 0 8px 8px!important; }
+            .message-in  .copyable-text { background:#FFFFFF!important; border-radius:0 8px 8px 8px!important; }
         """.trimIndent()
 
         val script = buildString {
