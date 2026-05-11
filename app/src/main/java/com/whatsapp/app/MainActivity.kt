@@ -302,26 +302,144 @@ class MainActivity : AppCompatActivity() {
 
             view.evaluateJavascript("""
                 (function(){
-                    var style = document.createElement('style');
-                    style.innerHTML =
-                        '::-webkit-scrollbar{display:none!important}' +
-                        'body{overflow-x:hidden!important;overscroll-behavior:none!important}' +
-                        '*{-webkit-tap-highlight-color:transparent!important}';
-                    document.head.appendChild(style);
-
+                    // ── Viewport device-width, no zoom ──
                     var meta = document.querySelector('meta[name=viewport]');
                     if(meta){
-                        var scale = (window.screen.width / 1024).toFixed(3);
                         meta.setAttribute('content',
-                            'width=1024,initial-scale='+scale+',maximum-scale=3.0,user-scalable=yes');
+                            'width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no');
                     }
+
+                    // ── Base styles ──
+                    if(document.getElementById('wa-injected-style')) return;
+                    var style = document.createElement('style');
+                    style.id = 'wa-injected-style';
+                    style.textContent = [
+                        '::-webkit-scrollbar{display:none!important}',
+                        'body{overflow-x:hidden!important;overscroll-behavior:none!important;margin:0!important;padding:0!important;background:#fff!important}',
+                        '*{-webkit-tap-highlight-color:transparent!important;box-sizing:border-box!important}'
+                    ].join('');
+                    document.head.appendChild(style);
+
+                    // ── Build native QR login UI ──
+                    function buildNativeUI() {
+                        if(document.getElementById('wa-native-ui')) return;
+
+                        var qrCanvas = document.querySelector('canvas[aria-label="Scan me!"]')
+                            || document.querySelector('[data-testid="qrcode"] canvas');
+                        var phoneBtn = document.querySelector('[data-testid="link-device-phone-number-method-button"]');
+
+                        if(!qrCanvas && !phoneBtn) return;
+
+                        var wrapper = document.createElement('div');
+                        wrapper.id = 'wa-native-ui';
+                        Object.assign(wrapper.style, {
+                            position:'fixed', top:'0', left:'0',
+                            width:'100vw', height:'100vh',
+                            background:'#fff', display:'flex',
+                            flexDirection:'column', alignItems:'center',
+                            zIndex:'99999', overflowY:'auto'
+                        });
+
+                        // Green header
+                        var header = document.createElement('div');
+                        Object.assign(header.style, {
+                            width:'100%', background:'#075E54',
+                            padding:'52px 20px 24px', textAlign:'center'
+                        });
+                        header.innerHTML = '<div style="color:#fff;font-size:22px;font-weight:700;">WhatsApp</div>';
+                        wrapper.appendChild(header);
+
+                        // Content area
+                        var content = document.createElement('div');
+                        Object.assign(content.style, {
+                            display:'flex', flexDirection:'column',
+                            alignItems:'center', padding:'32px 24px',
+                            width:'100%'
+                        });
+
+                        // Title
+                        var title = document.createElement('div');
+                        Object.assign(title.style, {
+                            fontSize:'20px', fontWeight:'700',
+                            color:'#111', marginBottom:'8px', textAlign:'center'
+                        });
+                        title.textContent = 'Log in to WhatsApp';
+                        content.appendChild(title);
+
+                        // Subtitle
+                        var sub = document.createElement('div');
+                        Object.assign(sub.style, {
+                            fontSize:'14px', color:'#667781',
+                            textAlign:'center', marginBottom:'28px', lineHeight:'1.5'
+                        });
+                        sub.textContent = 'Scan the QR code with your phone';
+                        content.appendChild(sub);
+
+                        // QR box
+                        if(qrCanvas) {
+                            var qrBox = document.createElement('div');
+                            Object.assign(qrBox.style, {
+                                background:'#fff', borderRadius:'20px',
+                                padding:'16px', marginBottom:'28px',
+                                boxShadow:'0 2px 24px rgba(0,0,0,0.12)'
+                            });
+                            Object.assign(qrCanvas.style, {
+                                width:'220px', height:'220px',
+                                display:'block', borderRadius:'8px'
+                            });
+                            qrBox.appendChild(qrCanvas);
+                            content.appendChild(qrBox);
+                        }
+
+                        wrapper.appendChild(content);
+
+                        // Phone number button
+                        var phoneBtnNew = document.createElement('button');
+                        Object.assign(phoneBtnNew.style, {
+                            width:'calc(100% - 48px)', maxWidth:'360px',
+                            padding:'16px', background:'#25D366',
+                            color:'#fff', border:'none', borderRadius:'28px',
+                            fontSize:'16px', fontWeight:'700',
+                            cursor:'pointer', margin:'0 24px 20px',
+                            display:'flex', alignItems:'center',
+                            justifyContent:'center'
+                        });
+                        phoneBtnNew.textContent = '📱  Link with phone number';
+                        if(phoneBtn) phoneBtnNew.onclick = function(){ phoneBtn.click(); };
+                        wrapper.appendChild(phoneBtnNew);
+
+                        // Footer
+                        var footer = document.createElement('div');
+                        Object.assign(footer.style, {
+                            color:'#aaa', fontSize:'12px',
+                            textAlign:'center', padding:'0 0 32px'
+                        });
+                        footer.textContent = '🔒  End-to-end encrypted';
+                        wrapper.appendChild(footer);
+
+                        document.body.appendChild(wrapper);
+
+                        // QR refresh watcher
+                        setInterval(function(){
+                            var ui = document.getElementById('wa-native-ui');
+                            if(!ui) return;
+                            var newQR = document.querySelector('canvas[aria-label="Scan me!"]');
+                            if(newQR && !ui.contains(newQR)){
+                                var box = ui.querySelector('div[style*="border-radius: 20px"], div[style*="borderRadius"]');
+                                if(box){ box.innerHTML=''; box.appendChild(newQR); }
+                            }
+                        }, 800);
+                    }
+
+                    buildNativeUI();
+                    var obs = new MutationObserver(buildNativeUI);
+                    obs.observe(document.body||document.documentElement, {childList:true, subtree:true});
                 })();
             """.trimIndent(), null)
 
             if (!pageLoaded) {
                 pageLoaded = true
-                // WhatsApp Web ready වෙනකන් 600ms wait කරලා fade out
-                handler.postDelayed({ hideSplash() }, 600)
+                handler.postDelayed({ hideSplash() }, 800)
             }
         }
 
