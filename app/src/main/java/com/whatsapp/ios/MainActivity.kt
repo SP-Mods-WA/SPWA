@@ -21,6 +21,7 @@ class MainActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
+        // Create layout programmatically
         val relativeLayout = RelativeLayout(this)
         relativeLayout.layoutParams = ViewGroup.LayoutParams(
             ViewGroup.LayoutParams.MATCH_PARENT,
@@ -28,11 +29,10 @@ class MainActivity : AppCompatActivity() {
         )
 
         webView = WebView(this)
-        val webViewParams = RelativeLayout.LayoutParams(
+        webView.layoutParams = RelativeLayout.LayoutParams(
             RelativeLayout.LayoutParams.MATCH_PARENT,
             RelativeLayout.LayoutParams.MATCH_PARENT
         )
-        webView.layoutParams = webViewParams
 
         progressBar = ProgressBar(this, null, android.R.attr.progressBarStyleHorizontal)
         progressBar.max = 100
@@ -48,7 +48,6 @@ class MainActivity : AppCompatActivity() {
 
         relativeLayout.addView(webView)
         relativeLayout.addView(progressBar)
-        
         setContentView(relativeLayout)
 
         setupWebView()
@@ -60,12 +59,9 @@ class MainActivity : AppCompatActivity() {
         webSettings.javaScriptEnabled = true
         webSettings.domStorageEnabled = true
         
-        // These two lines make the desktop site scale properly to phone screen
-        webSettings.loadWithOverviewMode = true   // Scales page to fit screen
-        webSettings.useWideViewPort = true        // Allows viewport meta tag
-        
-        // Optional: set initial scale to 1 (no default zoom)
-        webSettings.setInitialScale(1)
+        // Scale the desktop site to fit phone screen
+        webSettings.loadWithOverviewMode = true
+        webSettings.useWideViewPort = true
         
         webSettings.setSupportZoom(false)
         webSettings.builtInZoomControls = false
