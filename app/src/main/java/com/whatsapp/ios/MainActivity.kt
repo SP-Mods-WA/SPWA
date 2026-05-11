@@ -21,14 +21,12 @@ class MainActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        // Create main layout programmatically
         val relativeLayout = RelativeLayout(this)
         relativeLayout.layoutParams = ViewGroup.LayoutParams(
             ViewGroup.LayoutParams.MATCH_PARENT,
             ViewGroup.LayoutParams.MATCH_PARENT
         )
 
-        // Create WebView
         webView = WebView(this)
         val webViewParams = RelativeLayout.LayoutParams(
             RelativeLayout.LayoutParams.MATCH_PARENT,
@@ -36,7 +34,6 @@ class MainActivity : AppCompatActivity() {
         )
         webView.layoutParams = webViewParams
 
-        // Create ProgressBar
         progressBar = ProgressBar(this, null, android.R.attr.progressBarStyleHorizontal)
         progressBar.max = 100
         progressBar.progressTintList = android.content.res.ColorStateList.valueOf(Color.parseColor("#075E54"))
@@ -49,7 +46,6 @@ class MainActivity : AppCompatActivity() {
         progressBar.layoutParams = progressParams
         progressBar.visibility = android.view.View.GONE
 
-        // Add views to layout
         relativeLayout.addView(webView)
         relativeLayout.addView(progressBar)
         
@@ -63,8 +59,14 @@ class MainActivity : AppCompatActivity() {
         val webSettings: WebSettings = webView.settings
         webSettings.javaScriptEnabled = true
         webSettings.domStorageEnabled = true
-        webSettings.loadWithOverviewMode = true
-        webSettings.useWideViewPort = true
+        
+        // These two lines make the desktop site scale properly to phone screen
+        webSettings.loadWithOverviewMode = true   // Scales page to fit screen
+        webSettings.useWideViewPort = true        // Allows viewport meta tag
+        
+        // Optional: set initial scale to 1 (no default zoom)
+        webSettings.setInitialScale(1)
+        
         webSettings.setSupportZoom(false)
         webSettings.builtInZoomControls = false
         webSettings.cacheMode = WebSettings.LOAD_DEFAULT
@@ -73,11 +75,10 @@ class MainActivity : AppCompatActivity() {
         webSettings.mixedContentMode = WebSettings.MIXED_CONTENT_ALWAYS_ALLOW
         webSettings.databaseEnabled = true
 
-        // ★ CRITICAL: Set a desktop user agent to bypass mobile block ★
+        // Desktop user agent to get full WhatsApp Web
         val desktopUserAgent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
         webSettings.userAgentString = desktopUserAgent
 
-        // Cookie management for WhatsApp Web
         CookieManager.getInstance().setAcceptCookie(true)
         CookieManager.getInstance().setAcceptThirdPartyCookies(webView, true)
 
@@ -114,7 +115,6 @@ class MainActivity : AppCompatActivity() {
             }
         }
 
-        // Handle back button for WebView navigation
         webView.setOnKeyListener { _, keyCode, event ->
             if (keyCode == KeyEvent.KEYCODE_BACK && event.action == KeyEvent.ACTION_UP) {
                 if (webView.canGoBack()) {
