@@ -78,7 +78,11 @@ class MainActivity : AppCompatActivity() {
                 loadWithOverviewMode            = true
                 mixedContentMode                = WebSettings.MIXED_CONTENT_NEVER_ALLOW
                 cacheMode                       = WebSettings.LOAD_DEFAULT
+                javaScriptCanOpenWindowsAutomatically = true
+                loadsImagesAutomatically        = true
+                builtInZoomControls             = false
             }
+            setBackgroundColor(Color.TRANSPARENT)
             setLayerType(View.LAYER_TYPE_HARDWARE, null)
             webViewClient  = WaWebViewClient()
             webChromeClient = WaChromeClient()
@@ -145,7 +149,7 @@ class MainActivity : AppCompatActivity() {
             meta.addView(TextView(this@MainActivity).apply {
                 text = "from"
                 textSize = 13f
-                setTextColor(Color.WHITE.withAlpha(180))  // WHITE = Int, withAlpha(Int) = Int ✓
+                setTextColor(Color.WHITE.withAlpha(180))
                 gravity = Gravity.CENTER
             })
             meta.addView(TextView(this@MainActivity).apply {
@@ -225,9 +229,9 @@ class MainActivity : AppCompatActivity() {
 
     // ── Load WhatsApp ──────────────────────────────────────────
     private fun loadWhatsApp() {
-        if (!isOnline()) { showError(); return }
-        errorView.visibility = View.GONE
-        webView.visibility   = View.VISIBLE
+        errorView.visibility   = View.GONE
+        loadingView.visibility = View.VISIBLE
+        webView.visibility     = View.VISIBLE
         webView.loadUrl(URL)
     }
 
