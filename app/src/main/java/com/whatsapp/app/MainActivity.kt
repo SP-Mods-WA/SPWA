@@ -431,44 +431,20 @@ class MainActivity : AppCompatActivity() {
             progressBar.visibility = View.GONE
             CookieManager.getInstance().flush()
 
-            // Base CSS inject — viewport + scrollbar
-            view.evaluateJavascript("""
-                (function(){
-                    var m=document.querySelector('meta[name=viewport]');
-                    if(m) m.setAttribute('content',
-                        'width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no');
-                    if(!document.getElementById('wa-base')){
-                        var s=document.createElement('style');
-                        s.id='wa-base';
-                        s.textContent='::-webkit-scrollbar{display:none!important}'+
-                        'body{overflow-x:hidden!important;overscroll-behavior:none!important;}'+
-                        '*{-webkit-tap-highlight-color:transparent!important}';
-                        document.head.appendChild(s);
-                    }
-                })();
-            """.trimIndent(), null)
+            // WhatsApp Web: QR page = root URL, chat page = has title "WhatsApp"
+            // Use title detection — most reliable without JS injection
+            val isLoginPage = (url == "https://web.whatsapp.com/" || url == "https://web.whatsapp.com")
 
-            // QR page detect — show native overlay
-            handler.postDelayed({
-                view.evaluateJavascript("""
-                    (function(){
-                        var qr = document.querySelector('canvas[aria-label="Scan me!"]')
-                            || document.querySelector('[data-testid="qrcode"] canvas');
-                        var phone = document.querySelector('[data-testid="link-device-phone-number-method-button"]');
-                        return (qr || phone) ? 'qr' : 'chat';
-                    })();
-                """.trimIndent()) { result ->
-                    if (result?.contains("qr") == true) {
-                        showQROverlay()
-                    } else {
-                        removeQROverlay()
-                    }
-                }
-            }, 800)
+            if (isLoginPage) {
+                // Wait a bit for page to render then show overlay
+                handler.postDelayed({ showQROverlay() }, 600)
+            } else {
+                removeQROverlay()
+            }
 
             if (!pageLoaded) {
                 pageLoaded = true
-                handler.postDelayed({ hideSplash() }, 1200)
+                handler.postDelayed({ hideSplash() }, 1000)
             }
         }
 
