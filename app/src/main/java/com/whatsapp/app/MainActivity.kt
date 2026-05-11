@@ -241,10 +241,8 @@ class MainActivity : AppCompatActivity() {
             setOnClickListener {
                 userClickedPhoneBtn = true
                 removeQROverlay()
-                webView.evaluateJavascript(
-                    "document.querySelector('[data-testid="link-device-phone-number-method-button"]')?.click();",
-                    null
-                )
+                val jsClick = """document.querySelector('[data-testid="link-device-phone-number-method-button"]')?.click();"""
+                webView.evaluateJavascript(jsClick, null)
             }
         }
         btnContainer.addView(phoneBtn)
