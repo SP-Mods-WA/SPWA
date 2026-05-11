@@ -11,8 +11,6 @@ import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
 import android.view.View
-import android.view.animation.AlphaAnimation
-import android.view.animation.Animation
 import android.webkit.*
 import android.widget.*
 import androidx.appcompat.app.AppCompatActivity
@@ -38,7 +36,6 @@ class MainActivity : AppCompatActivity() {
         "AppleWebKit/537.36 (KHTML, like Gecko) " +
         "Chrome/124.0.0.0 Safari/537.36"
 
-    // Animated dots runnable
     private var dotCount = 0
     private val dotsRunnable = object : Runnable {
         override fun run() {
@@ -125,21 +122,22 @@ class MainActivity : AppCompatActivity() {
         setContentView(root)
     }
 
+    private fun dpToPx(dp: Int): Int =
+        (dp * resources.displayMetrics.density).toInt()
+
     private fun buildSplashView(): FrameLayout {
         return FrameLayout(this).apply {
             setBackgroundColor(Color.parseColor("#075E54"))
 
-            // Center content
             val centerLayout = LinearLayout(this@MainActivity).apply {
                 orientation = LinearLayout.VERTICAL
                 gravity = android.view.Gravity.CENTER
 
-                // WhatsApp icon circle
                 val iconBg = FrameLayout(this@MainActivity).apply {
-                    val size = dpToPx(100)
+                    val size = dpToPx(90)
                     layoutParams = LinearLayout.LayoutParams(size, size).also {
                         it.gravity = android.view.Gravity.CENTER_HORIZONTAL
-                        it.bottomMargin = dpToPx(24)
+                        it.bottomMargin = dpToPx(20)
                     }
                     background = android.graphics.drawable.GradientDrawable().apply {
                         shape = android.graphics.drawable.GradientDrawable.OVAL
@@ -147,7 +145,7 @@ class MainActivity : AppCompatActivity() {
                     }
                     addView(TextView(this@MainActivity).apply {
                         text = "✉"
-                        textSize = 44f
+                        textSize = 40f
                         setTextColor(Color.WHITE)
                         gravity = android.view.Gravity.CENTER
                         layoutParams = FrameLayout.LayoutParams(
@@ -157,17 +155,15 @@ class MainActivity : AppCompatActivity() {
                 }
                 addView(iconBg)
 
-                // App name
                 addView(TextView(this@MainActivity).apply {
                     text = "WhatsApp"
-                    textSize = 32f
+                    textSize = 30f
                     setTextColor(Color.WHITE)
                     typeface = android.graphics.Typeface.DEFAULT_BOLD
                     gravity = android.view.Gravity.CENTER
                     setPadding(0, 0, 0, dpToPx(8))
                 })
 
-                // Status text — "Loading your chats..."
                 splashStatusText = TextView(this@MainActivity).apply {
                     text = "Loading your chats"
                     textSize = 15f
@@ -176,11 +172,9 @@ class MainActivity : AppCompatActivity() {
                 }
                 addView(splashStatusText)
 
-                // Animated dots
                 val dotsRow = LinearLayout(this@MainActivity).apply {
                     orientation = LinearLayout.HORIZONTAL
                     gravity = android.view.Gravity.CENTER
-                    setPadding(0, 0, 0, 0)
                 }
                 splashDots = TextView(this@MainActivity).apply {
                     text = ""
@@ -198,12 +192,10 @@ class MainActivity : AppCompatActivity() {
                 it.gravity = android.view.Gravity.CENTER
             })
 
-            // Bottom text
             addView(LinearLayout(this@MainActivity).apply {
                 orientation = LinearLayout.VERTICAL
                 gravity = android.view.Gravity.CENTER
                 setPadding(0, 0, 0, dpToPx(48))
-
                 addView(TextView(this@MainActivity).apply {
                     text = "🔒  End-to-end encrypted"
                     textSize = 12f
@@ -222,15 +214,9 @@ class MainActivity : AppCompatActivity() {
         handler.removeCallbacks(dotsRunnable)
         if (splashView.visibility == View.GONE) return
         splashView.animate()
-            .alpha(0f)
-            .setDuration(400)
+            .alpha(0f).setDuration(400)
             .withEndAction { splashView.visibility = View.GONE; splashView.alpha = 1f }
             .start()
-    }
-
-    private fun showSplashWithStatus(text: String) {
-        splashStatusText.text = text
-        handler.post(dotsRunnable)
     }
 
     private fun buildErrorView(): LinearLayout {
@@ -248,7 +234,8 @@ class MainActivity : AppCompatActivity() {
             addView(TextView(this@MainActivity).apply {
                 text = "Internet සම්බන්ධතාව නැත"
                 textSize = 18f; setTextColor(Color.WHITE)
-                gravity = android.view.Gravity.CENTER; setPadding(0, dpToPx(16), 0, dpToPx(8))
+                gravity = android.view.Gravity.CENTER
+                setPadding(0, dpToPx(16), 0, dpToPx(8))
             })
             addView(TextView(this@MainActivity).apply {
                 text = "WiFi හෝ Mobile Data on කරන්න"
@@ -257,7 +244,8 @@ class MainActivity : AppCompatActivity() {
             })
             addView(android.widget.Button(this@MainActivity).apply {
                 text = "නැවත උත්සාහ කරන්න"
-                setBackgroundColor(Color.parseColor("#25D366")); setTextColor(Color.WHITE)
+                setBackgroundColor(Color.parseColor("#25D366"))
+                setTextColor(Color.WHITE)
                 setPadding(dpToPx(32), dpToPx(16), dpToPx(32), dpToPx(16))
                 layoutParams = LinearLayout.LayoutParams(
                     LinearLayout.LayoutParams.WRAP_CONTENT,
@@ -271,7 +259,8 @@ class MainActivity : AppCompatActivity() {
     private fun loadWhatsApp() {
         if (!isNetworkAvailable()) { showError(); return }
         errorView.visibility = View.GONE
-        showSplashWithStatus("Loading your chats")
+        splashStatusText.text = "Loading your chats"
+        handler.post(dotsRunnable)
         webView.loadUrl(WHATSAPP_URL)
     }
 
@@ -287,10 +276,8 @@ class MainActivity : AppCompatActivity() {
         return caps.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)
     }
 
-    private fun dpToPx(dp: Int): Int =
-        (dp * resources.displayMetrics.density).toInt()
-
     inner class WhatsAppWebViewClient : WebViewClient() {
+
         override fun onPageStarted(view: WebView, url: String, favicon: Bitmap?) {
             progressBar.visibility = View.VISIBLE
             progressBar.progress = 0
@@ -299,148 +286,116 @@ class MainActivity : AppCompatActivity() {
         override fun onPageFinished(view: WebView, url: String) {
             progressBar.visibility = View.GONE
             CookieManager.getInstance().flush()
-
-            view.evaluateJavascript("""
-                (function(){
-                    // ── Viewport device-width, no zoom ──
-                    var meta = document.querySelector('meta[name=viewport]');
-                    if(meta){
-                        meta.setAttribute('content',
-                            'width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no');
-                    }
-
-                    // ── Base styles ──
-                    if(document.getElementById('wa-injected-style')) return;
-                    var style = document.createElement('style');
-                    style.id = 'wa-injected-style';
-                    style.textContent = [
-                        '::-webkit-scrollbar{display:none!important}',
-                        'body{overflow-x:hidden!important;overscroll-behavior:none!important;margin:0!important;padding:0!important;background:#fff!important}',
-                        '*{-webkit-tap-highlight-color:transparent!important;box-sizing:border-box!important}'
-                    ].join('');
-                    document.head.appendChild(style);
-
-                    // ── Build native QR login UI ──
-                    function buildNativeUI() {
-                        if(document.getElementById('wa-native-ui')) return;
-
-                        var qrCanvas = document.querySelector('canvas[aria-label="Scan me!"]')
-                            || document.querySelector('[data-testid="qrcode"] canvas');
-                        var phoneBtn = document.querySelector('[data-testid="link-device-phone-number-method-button"]');
-
-                        if(!qrCanvas && !phoneBtn) return;
-
-                        var wrapper = document.createElement('div');
-                        wrapper.id = 'wa-native-ui';
-                        Object.assign(wrapper.style, {
-                            position:'fixed', top:'0', left:'0',
-                            width:'100vw', height:'100vh',
-                            background:'#fff', display:'flex',
-                            flexDirection:'column', alignItems:'center',
-                            zIndex:'99999', overflowY:'auto'
-                        });
-
-                        // Green header
-                        var header = document.createElement('div');
-                        Object.assign(header.style, {
-                            width:'100%', background:'#075E54',
-                            padding:'52px 20px 24px', textAlign:'center'
-                        });
-                        header.innerHTML = '<div style="color:#fff;font-size:22px;font-weight:700;">WhatsApp</div>';
-                        wrapper.appendChild(header);
-
-                        // Content area
-                        var content = document.createElement('div');
-                        Object.assign(content.style, {
-                            display:'flex', flexDirection:'column',
-                            alignItems:'center', padding:'32px 24px',
-                            width:'100%'
-                        });
-
-                        // Title
-                        var title = document.createElement('div');
-                        Object.assign(title.style, {
-                            fontSize:'20px', fontWeight:'700',
-                            color:'#111', marginBottom:'8px', textAlign:'center'
-                        });
-                        title.textContent = 'Log in to WhatsApp';
-                        content.appendChild(title);
-
-                        // Subtitle
-                        var sub = document.createElement('div');
-                        Object.assign(sub.style, {
-                            fontSize:'14px', color:'#667781',
-                            textAlign:'center', marginBottom:'28px', lineHeight:'1.5'
-                        });
-                        sub.textContent = 'Scan the QR code with your phone';
-                        content.appendChild(sub);
-
-                        // QR box
-                        if(qrCanvas) {
-                            var qrBox = document.createElement('div');
-                            Object.assign(qrBox.style, {
-                                background:'#fff', borderRadius:'20px',
-                                padding:'16px', marginBottom:'28px',
-                                boxShadow:'0 2px 24px rgba(0,0,0,0.12)'
-                            });
-                            Object.assign(qrCanvas.style, {
-                                width:'220px', height:'220px',
-                                display:'block', borderRadius:'8px'
-                            });
-                            qrBox.appendChild(qrCanvas);
-                            content.appendChild(qrBox);
-                        }
-
-                        wrapper.appendChild(content);
-
-                        // Phone number button
-                        var phoneBtnNew = document.createElement('button');
-                        Object.assign(phoneBtnNew.style, {
-                            width:'calc(100% - 48px)', maxWidth:'360px',
-                            padding:'16px', background:'#25D366',
-                            color:'#fff', border:'none', borderRadius:'28px',
-                            fontSize:'16px', fontWeight:'700',
-                            cursor:'pointer', margin:'0 24px 20px',
-                            display:'flex', alignItems:'center',
-                            justifyContent:'center'
-                        });
-                        phoneBtnNew.textContent = '📱  Link with phone number';
-                        if(phoneBtn) phoneBtnNew.onclick = function(){ phoneBtn.click(); };
-                        wrapper.appendChild(phoneBtnNew);
-
-                        // Footer
-                        var footer = document.createElement('div');
-                        Object.assign(footer.style, {
-                            color:'#aaa', fontSize:'12px',
-                            textAlign:'center', padding:'0 0 32px'
-                        });
-                        footer.textContent = '🔒  End-to-end encrypted';
-                        wrapper.appendChild(footer);
-
-                        document.body.appendChild(wrapper);
-
-                        // QR refresh watcher
-                        setInterval(function(){
-                            var ui = document.getElementById('wa-native-ui');
-                            if(!ui) return;
-                            var newQR = document.querySelector('canvas[aria-label="Scan me!"]');
-                            if(newQR && !ui.contains(newQR)){
-                                var box = ui.querySelector('div[style*="border-radius: 20px"], div[style*="borderRadius"]');
-                                if(box){ box.innerHTML=''; box.appendChild(newQR); }
-                            }
-                        }, 800);
-                    }
-
-                    buildNativeUI();
-                    var obs = new MutationObserver(buildNativeUI);
-                    obs.observe(document.body||document.documentElement, {childList:true, subtree:true});
-                })();
-            """.trimIndent(), null)
-
+            injectUI(view)
             if (!pageLoaded) {
                 pageLoaded = true
-                handler.postDelayed({ hideSplash() }, 800)
+                handler.postDelayed({ hideSplash() }, 1200)
             }
+        }
+
+        private fun injectUI(view: WebView) {
+            val js = """
+                (function tryInject() {
+                    var meta = document.querySelector('meta[name=viewport]');
+                    if(meta) meta.setAttribute('content',
+                        'width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no');
+
+                    if(!document.getElementById('wa-base-style')) {
+                        var s = document.createElement('style');
+                        s.id = 'wa-base-style';
+                        s.textContent =
+                            '::-webkit-scrollbar{display:none!important}' +
+                            'body{overflow-x:hidden!important;overscroll-behavior:none!important;margin:0!important;padding:0!important;}' +
+                            '*{-webkit-tap-highlight-color:transparent!important;box-sizing:border-box!important}';
+                        document.head.appendChild(s);
+                    }
+
+                    if(document.getElementById('wa-native-ui')) return;
+
+                    var qrCanvas = document.querySelector('canvas[aria-label="Scan me!"]')
+                        || document.querySelector('[data-testid="qrcode"] canvas');
+                    var phoneBtn = document.querySelector('[data-testid="link-device-phone-number-method-button"]');
+
+                    if(!qrCanvas && !phoneBtn) { setTimeout(tryInject, 600); return; }
+
+                    var ui = document.createElement('div');
+                    ui.id = 'wa-native-ui';
+                    Object.assign(ui.style, {
+                        position:'fixed', top:'0', left:'0', width:'100vw', height:'100vh',
+                        background:'#fff', display:'flex', flexDirection:'column',
+                        alignItems:'center', zIndex:'99999', overflowY:'auto', overflowX:'hidden'
+                    });
+
+                    var header = document.createElement('div');
+                    Object.assign(header.style, {
+                        width:'100%', background:'#075E54',
+                        padding:'48px 20px 20px', textAlign:'center', flexShrink:'0'
+                    });
+                    header.innerHTML = '<span style="color:#fff;font-size:22px;font-weight:700;">WhatsApp</span>';
+                    ui.appendChild(header);
+
+                    var content = document.createElement('div');
+                    Object.assign(content.style, {
+                        display:'flex', flexDirection:'column', alignItems:'center',
+                        padding:'28px 24px 0', width:'100%'
+                    });
+
+                    var h1 = document.createElement('div');
+                    Object.assign(h1.style, { fontSize:'20px', fontWeight:'700', color:'#111', marginBottom:'8px', textAlign:'center' });
+                    h1.textContent = 'Log in to WhatsApp';
+                    content.appendChild(h1);
+
+                    var sub = document.createElement('div');
+                    Object.assign(sub.style, { fontSize:'14px', color:'#667781', textAlign:'center', marginBottom:'24px', lineHeight:'1.5' });
+                    sub.textContent = 'Scan the QR code with your phone';
+                    content.appendChild(sub);
+
+                    if(qrCanvas) {
+                        var qrWrap = document.createElement('div');
+                        qrWrap.id = 'wa-qr-box';
+                        Object.assign(qrWrap.style, {
+                            background:'#fff', borderRadius:'20px', padding:'16px',
+                            marginBottom:'24px', boxShadow:'0 2px 20px rgba(0,0,0,0.12)'
+                        });
+                        Object.assign(qrCanvas.style, { width:'220px', height:'220px', display:'block', borderRadius:'8px' });
+                        qrWrap.appendChild(qrCanvas);
+                        content.appendChild(qrWrap);
+                    }
+
+                    ui.appendChild(content);
+
+                    var btn = document.createElement('button');
+                    Object.assign(btn.style, {
+                        width:'calc(100% - 48px)', maxWidth:'380px', padding:'16px 24px',
+                        background:'#25D366', color:'#fff', border:'none', borderRadius:'28px',
+                        fontSize:'16px', fontWeight:'700', cursor:'pointer',
+                        margin:'0 24px 16px', display:'block', textAlign:'center'
+                    });
+                    btn.textContent = 'Link with phone number';
+                    if(phoneBtn) btn.onclick = function(){ phoneBtn.click(); };
+                    ui.appendChild(btn);
+
+                    var footer = document.createElement('div');
+                    Object.assign(footer.style, { color:'#aaa', fontSize:'12px', textAlign:'center', padding:'8px 0 36px' });
+                    footer.textContent = 'End-to-end encrypted';
+                    ui.appendChild(footer);
+
+                    document.body.appendChild(ui);
+
+                    setInterval(function(){
+                        var box = document.getElementById('wa-qr-box');
+                        if(!box) return;
+                        var newCanvas = document.querySelector('canvas[aria-label="Scan me!"]');
+                        if(newCanvas && !box.contains(newCanvas)){
+                            box.innerHTML = '';
+                            Object.assign(newCanvas.style, { width:'220px', height:'220px', display:'block', borderRadius:'8px' });
+                            box.appendChild(newCanvas);
+                        }
+                    }, 1000);
+                })();
+            """.trimIndent()
+            view.evaluateJavascript(js, null)
+            handler.postDelayed({ view.evaluateJavascript(js, null) }, 1500)
         }
 
         override fun onReceivedError(view: WebView, request: WebResourceRequest, error: WebResourceError) {
@@ -458,13 +413,21 @@ class MainActivity : AppCompatActivity() {
             progressBar.progress = newProgress
             if (newProgress == 100) progressBar.visibility = View.GONE
         }
-        override fun onPermissionRequest(request: PermissionRequest) { request.grant(request.resources) }
+        override fun onPermissionRequest(request: PermissionRequest) {
+            request.grant(request.resources)
+        }
 
         private var fileCallback: ValueCallback<Array<android.net.Uri>>? = null
-        override fun onShowFileChooser(webView: WebView, filePathCallback: ValueCallback<Array<android.net.Uri>>, fileChooserParams: FileChooserParams): Boolean {
+        override fun onShowFileChooser(
+            webView: WebView,
+            filePathCallback: ValueCallback<Array<android.net.Uri>>,
+            fileChooserParams: FileChooserParams
+        ): Boolean {
             fileCallback = filePathCallback
-            return try { startActivityForResult(fileChooserParams.createIntent(), FILE_CHOOSER_REQUEST); true }
-            catch (e: Exception) { fileCallback = null; false }
+            return try {
+                startActivityForResult(fileChooserParams.createIntent(), FILE_CHOOSER_REQUEST)
+                true
+            } catch (e: Exception) { fileCallback = null; false }
         }
         fun getFileCallback() = fileCallback
         fun clearFileCallback() { fileCallback = null }
@@ -499,12 +462,18 @@ class MainActivity : AppCompatActivity() {
     }
 
     override fun onSaveInstanceState(outState: Bundle) {
-        super.onSaveInstanceState(outState); webView.saveState(outState)
+        super.onSaveInstanceState(outState)
+        webView.saveState(outState)
     }
 
     override fun onResume()  { super.onResume();  webView.onResume() }
     override fun onPause()   { super.onPause();   webView.onPause(); CookieManager.getInstance().flush() }
-    override fun onDestroy() { handler.removeCallbacksAndMessages(null); CookieManager.getInstance().flush(); webView.destroy(); super.onDestroy() }
+    override fun onDestroy() {
+        handler.removeCallbacksAndMessages(null)
+        CookieManager.getInstance().flush()
+        webView.destroy()
+        super.onDestroy()
+    }
 
     companion object { private const val FILE_CHOOSER_REQUEST = 1001 }
 }
