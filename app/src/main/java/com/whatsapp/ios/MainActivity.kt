@@ -145,7 +145,7 @@ class MainActivity : AppCompatActivity() {
             meta.addView(TextView(this@MainActivity).apply {
                 text = "from"
                 textSize = 13f
-                setTextColor(Color.WHITE.withAlpha(180))
+                setTextColor(Color.WHITE.withAlpha(180))  // WHITE = Int, withAlpha(Int) = Int ✓
                 gravity = Gravity.CENTER
             })
             meta.addView(TextView(this@MainActivity).apply {
@@ -322,7 +322,7 @@ class MainActivity : AppCompatActivity() {
         if (perms.isNotEmpty()) ActivityCompat.requestPermissions(this, perms.toTypedArray(), 100)
     }
 
-    private fun Color.withAlpha(a: Int) = Color.argb(a, Color.red(this), Color.green(this), Color.blue(this))
+    private fun Int.withAlpha(a: Int): Int = Color.argb(a, Color.red(this), Color.green(this), Color.blue(this))
     private val Int.dp get() = (this * resources.displayMetrics.density).toInt()
 
     @Deprecated("Deprecated in Java")
