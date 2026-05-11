@@ -30,11 +30,11 @@ class MainActivity : AppCompatActivity() {
 
     private val URL = "https://web.whatsapp.com"
 
-    // iOS iPhone 15 Pro user agent
+    // Desktop Chrome user agent - WhatsApp Web requires desktop browser
     private val USER_AGENT =
-        "Mozilla/5.0 (iPhone; CPU iPhone OS 17_4 like Mac OS X) " +
-        "AppleWebKit/605.1.15 (KHTML, like Gecko) " +
-        "Version/17.4 Mobile/15E148 Safari/604.1"
+        "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) " +
+        "AppleWebKit/537.36 (KHTML, like Gecko) " +
+        "Chrome/120.0.0.0 Safari/537.36"
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -53,7 +53,7 @@ class MainActivity : AppCompatActivity() {
     @SuppressLint("SetJavaScriptEnabled")
     private fun buildUI() {
         val root = FrameLayout(this).apply {
-            setBackgroundColor(Color.WHITE)
+            setBackgroundColor(Color.parseColor("#34C759"))
         }
 
         // SwipeRefresh
@@ -82,15 +82,13 @@ class MainActivity : AppCompatActivity() {
                 loadsImagesAutomatically        = true
                 builtInZoomControls             = false
             }
-            setBackgroundColor(Color.TRANSPARENT)
+            setBackgroundColor(Color.WHITE)
             setLayerType(View.LAYER_TYPE_HARDWARE, null)
             webViewClient  = WaWebViewClient()
             webChromeClient = WaChromeClient()
         }
 
-        swipeRefresh.addView(webView, ViewGroup.LayoutParams(
-            ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT
-        ))
+        swipeRefresh.addView(webView)
         root.addView(swipeRefresh, FrameLayout.LayoutParams(
             FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT
         ))
