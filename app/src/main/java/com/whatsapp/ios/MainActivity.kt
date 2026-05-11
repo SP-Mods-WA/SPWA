@@ -30,17 +30,37 @@ class MainActivity : AppCompatActivity() {
 
     private val URL = "https://web.whatsapp.com"
 
-    // Desktop Chrome user agent - WhatsApp Web requires desktop browser
+    // ─── Android WhatsApp Web User Agent (matches screenshot - GBWhatsApp style)
     private val USER_AGENT =
-        "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) " +
+        "Mozilla/5.0 (Linux; Android 13; Pixel 7) " +
         "AppleWebKit/537.36 (KHTML, like Gecko) " +
-        "Chrome/120.0.0.0 Safari/537.36"
+        "Chrome/120.0.0.0 Mobile Safari/537.36"
+
+    // ─── Colors matching the screenshot exactly
+    private val COLOR_GREEN        = "#25D366"   // WhatsApp green (header title)
+    private val COLOR_HEADER_BG    = "#FFFFFF"   // White header background
+    private val COLOR_BG           = "#F0F2F5"   // Chat list background
+    private val COLOR_UNREAD_BADGE = "#25D366"   // Green badge
+    private val COLOR_UNREAD_TIME  = "#25D366"   // Green time for unread
+    private val COLOR_TEXT_PRIMARY = "#111B21"   // Dark text
+    private val COLOR_TEXT_SEC     = "#667781"   // Secondary grey text
+    private val COLOR_BORDER       = "#E9EDEF"   // Divider color
+    private val COLOR_HIGHLIGHT    = "#F5F6F6"   // Selected chat highlight
+    private val COLOR_FILTER_ACTIVE= "#D9FDD3"   // Active filter chip bg
+    private val COLOR_ICON         = "#54656F"   // Icon grey
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+
+        // ─── Edge-to-edge like WhatsApp Android
         WindowCompat.setDecorFitsSystemWindows(window, false)
-        window.statusBarColor = Color.parseColor("#34C759")   // iOS green
-        window.navigationBarColor = Color.parseColor("#F2F2F7")
+        window.statusBarColor  = Color.parseColor(COLOR_HEADER_BG)
+        window.navigationBarColor = Color.parseColor(COLOR_BG)
+
+        // Light status bar icons (dark icons on white bg)
+        window.decorView.systemUiVisibility =
+            View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR or
+            View.SYSTEM_UI_FLAG_LIGHT_NAVIGATION_BAR
 
         prefs = getSharedPreferences("gb_prefs", Context.MODE_PRIVATE)
         requestPerms()
@@ -53,113 +73,143 @@ class MainActivity : AppCompatActivity() {
     @SuppressLint("SetJavaScriptEnabled")
     private fun buildUI() {
         val root = FrameLayout(this).apply {
-            setBackgroundColor(Color.parseColor("#34C759"))
+            setBackgroundColor(Color.parseColor(COLOR_BG))
         }
 
-        // SwipeRefresh
+        // ─── SwipeRefresh
         swipeRefresh = SwipeRefreshLayout(this).apply {
-            setColorSchemeColors(Color.parseColor("#34C759"))
+            setColorSchemeColors(Color.parseColor(COLOR_GREEN))
+            setProgressBackgroundColorSchemeColor(Color.WHITE)
             setOnRefreshListener { webView.reload() }
         }
 
-        // WebView
+        // ─── WebView - loads web.whatsapp.com with Android UA
         webView = WebView(this).apply {
             settings.apply {
-                javaScriptEnabled               = true
-                domStorageEnabled               = true
-                databaseEnabled                 = true
-                userAgentString                 = USER_AGENT
+                javaScriptEnabled                = true
+                domStorageEnabled                = true
+                databaseEnabled                  = true
+                userAgentString                  = USER_AGENT
                 mediaPlaybackRequiresUserGesture = false
-                allowFileAccess                 = true
-                allowContentAccess              = true
-                setSupportZoom(false)
-                displayZoomControls             = false
-                useWideViewPort                 = true
-                loadWithOverviewMode            = true
-                mixedContentMode                = WebSettings.MIXED_CONTENT_ALWAYS_ALLOW
-                cacheMode                       = WebSettings.LOAD_DEFAULT
-                javaScriptCanOpenWindowsAutomatically = true
-                loadsImagesAutomatically        = true
-                builtInZoomControls             = false
+                allowFileAccess                  = true
+                allowContentAccess               = true
+                setSupportZoom(true)
+                builtInZoomControls              = true
+                displayZoomControls              = false
+                useWideViewPort                  = true
+                loadWithOverviewMode             = true
+                mixedContentMode                 = WebSettings.MIXED_CONTENT_NEVER_ALLOW
+                cacheMode                        = WebSettings.LOAD_DEFAULT
             }
-            setBackgroundColor(Color.WHITE)
             setLayerType(View.LAYER_TYPE_HARDWARE, null)
-            webViewClient  = WaWebViewClient()
+            webViewClient   = WaWebViewClient()
             webChromeClient = WaChromeClient()
         }
 
         swipeRefresh.addView(webView)
         root.addView(swipeRefresh, FrameLayout.LayoutParams(
-            FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT
+            FrameLayout.LayoutParams.MATCH_PARENT,
+            FrameLayout.LayoutParams.MATCH_PARENT
         ))
 
-        // Loading screen - iOS style splash
+        // ─── Loading screen (Android WhatsApp splash)
         loadingView = buildLoadingView()
         root.addView(loadingView, FrameLayout.LayoutParams(
-            FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT
+            FrameLayout.LayoutParams.MATCH_PARENT,
+            FrameLayout.LayoutParams.MATCH_PARENT
         ))
 
-        // Error view
+        // ─── Error view
         errorView = buildErrorView()
         errorView.visibility = View.GONE
         root.addView(errorView, FrameLayout.LayoutParams(
-            FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT
+            FrameLayout.LayoutParams.MATCH_PARENT,
+            FrameLayout.LayoutParams.MATCH_PARENT
         ))
 
-        // GB Menu button (floating)
+        // ─── GB Settings FAB (top-right, matches screenshot ⋮ menu area)
         val gbBtn = buildGBButton()
         root.addView(gbBtn, FrameLayout.LayoutParams(
-            160.dp, 40.dp, Gravity.TOP or Gravity.END
-        ).apply { topMargin = 56.dp; rightMargin = 8.dp })
+            FrameLayout.LayoutParams.WRAP_CONTENT, 36.dp,
+            Gravity.TOP or Gravity.END
+        ).apply {
+            topMargin   = 52.dp
+            rightMargin = 12.dp
+        })
 
         setContentView(root)
     }
 
+    // ─────────────────────────────────────────────────────────────
+    // Loading Screen  — Android WhatsApp green splash
+    // ─────────────────────────────────────────────────────────────
     private fun buildLoadingView(): FrameLayout {
         return FrameLayout(this).apply {
-            setBackgroundColor(Color.parseColor("#34C759"))
-            val col = LinearLayout(this@MainActivity).apply {
+            setBackgroundColor(Color.parseColor(COLOR_GREEN))
+
+            // Centre: WhatsApp logo + name
+            val centre = LinearLayout(this@MainActivity).apply {
                 orientation = LinearLayout.VERTICAL
-                gravity = Gravity.CENTER
+                gravity     = Gravity.CENTER
             }
-            col.addView(TextView(this@MainActivity).apply {
-                text = "💬"
-                textSize = 72f
-                gravity = Gravity.CENTER
-            })
-            col.addView(TextView(this@MainActivity).apply {
-                text = "WhatsApp"
-                textSize = 24f
-                typeface = android.graphics.Typeface.DEFAULT_BOLD
+            // WhatsApp icon circle
+            val iconWrapper = FrameLayout(this@MainActivity).apply {
+                val size = 80.dp
+                layoutParams = LinearLayout.LayoutParams(size, size).apply {
+                    gravity = Gravity.CENTER_HORIZONTAL
+                }
+                background = android.graphics.drawable.GradientDrawable().apply {
+                    shape       = android.graphics.drawable.GradientDrawable.OVAL
+                    setColor(Color.WHITE)
+                }
+            }
+            val icon = TextView(this@MainActivity).apply {
+                text     = "💬"
+                textSize = 36f
+                gravity  = Gravity.CENTER
+                layoutParams = FrameLayout.LayoutParams(
+                    FrameLayout.LayoutParams.MATCH_PARENT,
+                    FrameLayout.LayoutParams.MATCH_PARENT
+                )
+            }
+            iconWrapper.addView(icon)
+            centre.addView(iconWrapper)
+
+            centre.addView(TextView(this@MainActivity).apply {
+                text      = "WhatsApp"
+                textSize  = 26f
+                typeface  = android.graphics.Typeface.DEFAULT_BOLD
                 setTextColor(Color.WHITE)
-                gravity = Gravity.CENTER
-                setPadding(0, 16.dp, 0, 0)
+                gravity   = Gravity.CENTER
+                setPadding(0, 20.dp, 0, 0)
             })
-            addView(col, FrameLayout.LayoutParams(
+
+            addView(centre, FrameLayout.LayoutParams(
                 FrameLayout.LayoutParams.WRAP_CONTENT,
                 FrameLayout.LayoutParams.WRAP_CONTENT,
                 Gravity.CENTER
             ))
-            // "from Meta" bottom
-            val meta = LinearLayout(this@MainActivity).apply {
+
+            // Bottom: "from Meta"
+            val metaLayout = LinearLayout(this@MainActivity).apply {
                 orientation = LinearLayout.VERTICAL
-                gravity = Gravity.CENTER
-                setPadding(0, 0, 0, 40.dp)
+                gravity     = Gravity.CENTER
+                setPadding(0, 0, 0, 48.dp)
             }
-            meta.addView(TextView(this@MainActivity).apply {
-                text = "from"
-                textSize = 13f
-                setTextColor(Color.WHITE.withAlpha(180))
-                gravity = Gravity.CENTER
+            metaLayout.addView(TextView(this@MainActivity).apply {
+                text      = "from"
+                textSize  = 13f
+                setTextColor(Color.argb(200, 255, 255, 255))
+                gravity   = Gravity.CENTER
             })
-            meta.addView(TextView(this@MainActivity).apply {
-                text = "Meta"
-                textSize = 14f
-                typeface = android.graphics.Typeface.DEFAULT_BOLD
+            metaLayout.addView(TextView(this@MainActivity).apply {
+                text      = "Meta"
+                textSize  = 15f
+                typeface  = android.graphics.Typeface.DEFAULT_BOLD
                 setTextColor(Color.WHITE)
-                gravity = Gravity.CENTER
+                gravity   = Gravity.CENTER
             })
-            addView(meta, FrameLayout.LayoutParams(
+            addView(metaLayout, FrameLayout.LayoutParams(
                 FrameLayout.LayoutParams.MATCH_PARENT,
                 FrameLayout.LayoutParams.WRAP_CONTENT,
                 Gravity.BOTTOM
@@ -167,39 +217,45 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+    // ─────────────────────────────────────────────────────────────
+    // Error View  — clean Android style
+    // ─────────────────────────────────────────────────────────────
     private fun buildErrorView(): LinearLayout {
         return LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            gravity = Gravity.CENTER
-            setBackgroundColor(Color.parseColor("#F2F2F7"))
+            gravity     = Gravity.CENTER
+            setBackgroundColor(Color.parseColor(COLOR_BG))
             setPadding(48.dp, 48.dp, 48.dp, 48.dp)
 
             addView(TextView(this@MainActivity).apply {
-                text = "📵"
+                text     = "📵"
                 textSize = 56f
-                gravity = Gravity.CENTER
+                gravity  = Gravity.CENTER
             })
             addView(TextView(this@MainActivity).apply {
-                text = "No Internet Connection"
-                textSize = 20f
-                typeface = android.graphics.Typeface.DEFAULT_BOLD
-                setTextColor(Color.BLACK)
-                gravity = Gravity.CENTER
+                text      = "No Internet Connection"
+                textSize  = 20f
+                typeface  = android.graphics.Typeface.DEFAULT_BOLD
+                setTextColor(Color.parseColor(COLOR_TEXT_PRIMARY))
+                gravity   = Gravity.CENTER
                 setPadding(0, 20.dp, 0, 8.dp)
             })
             addView(TextView(this@MainActivity).apply {
-                text = "Turn on Wi-Fi or Cellular Data and try again."
-                textSize = 14f
-                setTextColor(Color.parseColor("#8E8E93"))
-                gravity = Gravity.CENTER
+                text      = "Turn on Wi-Fi or Mobile Data and try again."
+                textSize  = 14f
+                setTextColor(Color.parseColor(COLOR_TEXT_SEC))
+                gravity   = Gravity.CENTER
                 setPadding(0, 0, 0, 32.dp)
             })
             addView(Button(this@MainActivity).apply {
-                text = "Try Again"
-                setBackgroundColor(Color.parseColor("#007AFF"))
+                text = "Retry"
+                background = android.graphics.drawable.GradientDrawable().apply {
+                    setColor(Color.parseColor(COLOR_GREEN))
+                    cornerRadius = 24f.dp
+                }
                 setTextColor(Color.WHITE)
-                setPadding(40.dp, 12.dp, 40.dp, 12.dp)
-                textSize = 16f
+                textSize = 15f
+                setPadding(40.dp, 0, 40.dp, 0)
                 setOnClickListener {
                     errorView.visibility = View.GONE
                     loadWhatsApp()
@@ -208,44 +264,136 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+    // ─────────────────────────────────────────────────────────────
+    // GB Settings Button  — pill style, top-right
+    // ─────────────────────────────────────────────────────────────
     private fun buildGBButton(): TextView {
         return TextView(this).apply {
-            text = "⚡ GB Settings"
-            textSize = 12f
+            text      = "⚡ GB"
+            textSize  = 11f
             setTextColor(Color.WHITE)
-            setBackgroundColor(Color.parseColor("#34C759"))
-            gravity = Gravity.CENTER
-            setPadding(12.dp, 6.dp, 12.dp, 6.dp)
-            // Rounded
+            gravity   = Gravity.CENTER
+            setPadding(14.dp, 0, 14.dp, 0)
             background = android.graphics.drawable.GradientDrawable().apply {
-                setColor(Color.parseColor("#34C759"))
-                cornerRadius = 20f
+                setColor(Color.parseColor(COLOR_GREEN))
+                cornerRadius = 18f.dp
             }
+            elevation = 4f.dp.toFloat()
             setOnClickListener {
                 startActivity(Intent(this@MainActivity, SettingsActivity::class.java))
             }
         }
     }
 
-    // ── Load WhatsApp ──────────────────────────────────────────
+    // ─────────────────────────────────────────────────────────────
+    // JS Injection — injects Android-native WhatsApp look + GB features
+    // ─────────────────────────────────────────────────────────────
+    private fun injectFeatures() {
+        val antiDelete    = prefs.getBoolean("anti_delete",  true)
+        val hideBlueCheck = prefs.getBoolean("hide_blue",    false)
+
+        // Inject CSS to make web.whatsapp.com look like the Android app screenshot
+        val css = """
+            /* Hide WhatsApp Web desktop chrome */
+            ._aigs, ._aigw { display:none!important; }
+
+            /* Header: white bg, green title */
+            header, [data-testid="chatlist-header"] {
+                background:#FFFFFF!important;
+                box-shadow: 0 1px 3px rgba(0,0,0,0.12)!important;
+            }
+
+            /* Chat list background */
+            #pane-side, [data-testid="chat-list"] {
+                background:#F0F2F5!important;
+            }
+
+            /* Chat list item */
+            [data-testid="cell-frame-container"] {
+                background:#FFFFFF!important;
+                border-bottom:1px solid #E9EDEF!important;
+            }
+            [data-testid="cell-frame-container"]:active {
+                background:#F5F6F6!important;
+            }
+
+            /* Unread badge — green */
+            [data-testid="icon-unread-count"] span,
+            .x1sxyh0 .x6s0dn4 span {
+                background:#25D366!important;
+                color:#fff!important;
+                font-size:11px!important;
+                min-width:20px!important;
+                height:20px!important;
+                border-radius:10px!important;
+            }
+
+            /* Search bar */
+            [data-testid="search-bar-input-container"] {
+                background:#F0F2F5!important;
+                border-radius:8px!important;
+                margin:8px 12px!important;
+            }
+
+            /* Filter chips (All / Unread / Favorites / Groups) */
+            [data-testid="filter-tab-active"] {
+                background:#D9FDD3!important;
+                color:#25D366!important;
+                border:none!important;
+                border-radius:16px!important;
+            }
+
+            /* Scrollbar */
+            ::-webkit-scrollbar { width:3px; }
+            ::-webkit-scrollbar-thumb { background:#25D366; border-radius:3px; }
+
+            /* Double-tick colour */
+            [data-testid="msg-dblcheck"] { color:#53BDEB!important; }
+        """.trimIndent()
+
+        val script = buildString {
+            // Apply CSS
+            append("""
+                var st=document.createElement('style');
+                st.id='gb-android-style';
+                st.textContent=`$css`;
+                document.head.appendChild(st);
+            """.trimIndent())
+
+            // Anti-delete
+            if (antiDelete) append("""
+                window._gbAntiDelete=true;
+                document.addEventListener('DOMSubtreeModified',function(){
+                    document.querySelectorAll('[data-testid="recalled-msg"]').forEach(function(e){
+                        e.style.display='none';
+                    });
+                });
+            """.trimIndent())
+
+            // Hide blue ticks
+            if (hideBlueCheck) append("""
+                var bs=document.createElement('style');
+                bs.textContent='[data-testid="msg-dblcheck"]{filter:grayscale(1)!important;}';
+                document.head.appendChild(bs);
+            """.trimIndent())
+        }
+
+        webView.evaluateJavascript("(function(){$script})();", null)
+    }
+
+    // ─────────────────────────────────────────────────────────────
+    // Load
+    // ─────────────────────────────────────────────────────────────
     private fun loadWhatsApp() {
+        if (!isOnline()) { showError(); return }
         errorView.visibility   = View.GONE
-        loadingView.visibility = View.VISIBLE
         webView.visibility     = View.VISIBLE
         webView.loadUrl(URL)
     }
 
-    // ── Inject GB features after page load ────────────────────
-    private fun injectFeatures() {
-        val script = GBFeatures.buildInjectionScript(
-            antiDelete    = prefs.getBoolean("anti_delete", true),
-            iosTheme      = prefs.getBoolean("ios_theme",   true),
-            hideBlueCheck = prefs.getBoolean("hide_blue",   false),
-        )
-        webView.evaluateJavascript("(function(){$script})();", null)
-    }
-
-    // ── WebViewClient ──────────────────────────────────────────
+    // ─────────────────────────────────────────────────────────────
+    // WebViewClient
+    // ─────────────────────────────────────────────────────────────
     inner class WaWebViewClient : WebViewClient() {
 
         override fun onPageStarted(view: WebView, url: String, favicon: Bitmap?) {
@@ -255,24 +403,31 @@ class MainActivity : AppCompatActivity() {
         override fun onPageFinished(view: WebView, url: String) {
             loadingView.visibility = View.GONE
             swipeRefresh.isRefreshing = false
-
-            // Inject GB features
+            // Inject after DOM settles
             webView.postDelayed({ injectFeatures() }, 1500)
         }
 
-        override fun onReceivedError(view: WebView, req: WebResourceRequest, err: WebResourceError) {
+        override fun onReceivedError(
+            view: WebView, req: WebResourceRequest, err: WebResourceError
+        ) {
             if (req.isForMainFrame) showError()
         }
 
-        override fun shouldOverrideUrlLoading(view: WebView, req: WebResourceRequest): Boolean {
+        override fun shouldOverrideUrlLoading(
+            view: WebView, req: WebResourceRequest
+        ): Boolean {
             val url = req.url.toString()
             return !url.contains("whatsapp.com") && !url.contains("wa.me")
         }
     }
 
-    // ── ChromeClient ───────────────────────────────────────────
+    // ─────────────────────────────────────────────────────────────
+    // ChromeClient
+    // ─────────────────────────────────────────────────────────────
     inner class WaChromeClient : WebChromeClient() {
-        override fun onPermissionRequest(req: PermissionRequest) = req.grant(req.resources)
+
+        override fun onPermissionRequest(req: PermissionRequest) =
+            req.grant(req.resources)
 
         private var fileCallback: ValueCallback<Array<android.net.Uri>>? = null
 
@@ -289,7 +444,8 @@ class MainActivity : AppCompatActivity() {
                 fileCallback = null; false
             }
         }
-        fun getFileCb() = fileCallback
+
+        fun getFileCb()  = fileCallback
         fun clearFileCb() { fileCallback = null }
     }
 
@@ -303,15 +459,17 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    // ── Helpers ────────────────────────────────────────────────
+    // ─────────────────────────────────────────────────────────────
+    // Helpers
+    // ─────────────────────────────────────────────────────────────
     private fun showError() {
-        webView.visibility   = View.GONE
+        webView.visibility     = View.GONE
         loadingView.visibility = View.GONE
-        errorView.visibility = View.VISIBLE
+        errorView.visibility   = View.VISIBLE
     }
 
     private fun isOnline(): Boolean {
-        val cm = getSystemService(CONNECTIVITY_SERVICE) as ConnectivityManager
+        val cm   = getSystemService(CONNECTIVITY_SERVICE) as ConnectivityManager
         val caps = cm.getNetworkCapabilities(cm.activeNetwork) ?: return false
         return caps.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)
     }
@@ -322,20 +480,27 @@ class MainActivity : AppCompatActivity() {
             Manifest.permission.RECORD_AUDIO,
             Manifest.permission.READ_MEDIA_IMAGES,
             Manifest.permission.READ_MEDIA_VIDEO,
-        ).filter { ContextCompat.checkSelfPermission(this, it) != PackageManager.PERMISSION_GRANTED }
-        if (perms.isNotEmpty()) ActivityCompat.requestPermissions(this, perms.toTypedArray(), 100)
+        ).filter {
+            ContextCompat.checkSelfPermission(this, it) != PackageManager.PERMISSION_GRANTED
+        }
+        if (perms.isNotEmpty())
+            ActivityCompat.requestPermissions(this, perms.toTypedArray(), 100)
     }
 
-    private fun Int.withAlpha(a: Int): Int = Color.argb(a, Color.red(this), Color.green(this), Color.blue(this))
-    private val Int.dp get() = (this * resources.displayMetrics.density).toInt()
+    private val Float.dp get() = (this * resources.displayMetrics.density)
+    private val Int.dp   get() = (this * resources.displayMetrics.density).toInt()
 
     @Deprecated("Deprecated in Java")
     override fun onBackPressed() {
         if (webView.canGoBack()) webView.goBack() else super.onBackPressed()
     }
 
-    override fun onSaveInstanceState(out: Bundle) { super.onSaveInstanceState(out); webView.saveState(out) }
-    override fun onResume()  { super.onResume();  webView.onResume() }
+    override fun onSaveInstanceState(out: Bundle) {
+        super.onSaveInstanceState(out)
+        webView.saveState(out)
+    }
+
+    override fun onResume()  { super.onResume();  webView.onResume();  injectFeatures() }
     override fun onPause()   { super.onPause();   webView.onPause() }
-    override fun onDestroy() { webView.destroy();  super.onDestroy() }
+    override fun onDestroy() { webView.destroy(); super.onDestroy() }
 }
