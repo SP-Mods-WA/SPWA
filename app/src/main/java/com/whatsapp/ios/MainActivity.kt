@@ -72,7 +72,10 @@ class MainActivity : AppCompatActivity() {
         webSettings.allowContentAccess = true
         webSettings.mixedContentMode = WebSettings.MIXED_CONTENT_ALWAYS_ALLOW
         webSettings.databaseEnabled = true
-        // Note: setAppCacheEnabled is removed in latest Android - do not use
+
+        // ★ CRITICAL: Set a desktop user agent to bypass mobile block ★
+        val desktopUserAgent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+        webSettings.userAgentString = desktopUserAgent
 
         // Cookie management for WhatsApp Web
         CookieManager.getInstance().setAcceptCookie(true)
