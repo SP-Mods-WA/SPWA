@@ -53,7 +53,7 @@ class MainActivity : AppCompatActivity() {
     @SuppressLint("SetJavaScriptEnabled")
     private fun buildUI() {
         val root = FrameLayout(this).apply {
-            setBackgroundColor(Color.parseColor("#34C759"))
+            setBackgroundColor(Color.WHITE)
         }
 
         // SwipeRefresh
@@ -76,7 +76,7 @@ class MainActivity : AppCompatActivity() {
                 displayZoomControls             = false
                 useWideViewPort                 = true
                 loadWithOverviewMode            = true
-                mixedContentMode                = WebSettings.MIXED_CONTENT_NEVER_ALLOW
+                mixedContentMode                = WebSettings.MIXED_CONTENT_ALWAYS_ALLOW
                 cacheMode                       = WebSettings.LOAD_DEFAULT
                 javaScriptCanOpenWindowsAutomatically = true
                 loadsImagesAutomatically        = true
@@ -88,7 +88,9 @@ class MainActivity : AppCompatActivity() {
             webChromeClient = WaChromeClient()
         }
 
-        swipeRefresh.addView(webView)
+        swipeRefresh.addView(webView, ViewGroup.LayoutParams(
+            ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT
+        ))
         root.addView(swipeRefresh, FrameLayout.LayoutParams(
             FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT
         ))
@@ -335,7 +337,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     override fun onSaveInstanceState(out: Bundle) { super.onSaveInstanceState(out); webView.saveState(out) }
-    override fun onResume()  { super.onResume();  webView.onResume();  injectFeatures() }
+    override fun onResume()  { super.onResume();  webView.onResume() }
     override fun onPause()   { super.onPause();   webView.onPause() }
     override fun onDestroy() { webView.destroy();  super.onDestroy() }
 }
