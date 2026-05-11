@@ -34,6 +34,7 @@ class MainActivity : AppCompatActivity() {
     private lateinit var rootLayout: FrameLayout
 
     private var pageLoaded = false
+    private var userClickedPhoneBtn = false
     private val handler = Handler(Looper.getMainLooper())
 
     private val PERMISSION_REQUEST = 100
@@ -238,12 +239,12 @@ class MainActivity : AppCompatActivity() {
             }
             // Click forward to WebView's phone number button via JS
             setOnClickListener {
+                userClickedPhoneBtn = true
+                removeQROverlay()
                 webView.evaluateJavascript(
-                    "document.querySelector('[data-testid=\"link-device-phone-number-method-button\"]')?.click();",
+                    "document.querySelector('[data-testid="link-device-phone-number-method-button"]')?.click();",
                     null
                 )
-                // Remove overlay so WebView phone login page shows
-                removeQROverlay()
             }
         }
         btnContainer.addView(phoneBtn)
@@ -435,8 +436,7 @@ class MainActivity : AppCompatActivity() {
             // Use title detection — most reliable without JS injection
             val isLoginPage = (url == "https://web.whatsapp.com/" || url == "https://web.whatsapp.com")
 
-            if (isLoginPage) {
-                // Wait a bit for page to render then show overlay
+            if (isLoginPage && !userClickedPhoneBtn) {
                 handler.postDelayed({ showQROverlay() }, 600)
             } else {
                 removeQROverlay()
@@ -454,9 +454,11 @@ class MainActivity : AppCompatActivity() {
 
         override fun shouldOverrideUrlLoading(view: WebView, request: WebResourceRequest): Boolean {
             val url = request.url.toString()
-            // Remove QR overlay when navigating away from QR page
             if (!url.contains("web.whatsapp.com")) return true
-            removeQROverlay()
+            // If navigating away from root (phone login flow or chat), remove overlay
+            if (url != "https://web.whatsapp.com/" && url != "https://web.whatsapp.com") {
+                removeQROverlay()
+            }
             return false
         }
     }
