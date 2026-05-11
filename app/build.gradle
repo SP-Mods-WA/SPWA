@@ -4,11 +4,11 @@ plugins {
 }
 
 android {
-    namespace 'com.whatsapp.app'
+    namespace 'com.whatsapp.ios'
     compileSdk 34
 
     defaultConfig {
-        applicationId "com.whatsapp.app"
+        applicationId "com.whatsapp.ios"
         minSdk 26
         targetSdk 34
         versionCode 1
@@ -27,13 +27,12 @@ android {
         targetCompatibility JavaVersion.VERSION_17
     }
 
-    kotlinOptions {
-        jvmTarget = '17'
-    }
+    kotlinOptions { jvmTarget = '17' }
 }
 
 dependencies {
     implementation 'androidx.core:core-ktx:1.12.0'
     implementation 'androidx.appcompat:appcompat:1.6.1'
     implementation 'androidx.swiperefreshlayout:swiperefreshlayout:1.1.0'
+    implementation 'com.google.android.material:material:1.11.0'
 }
