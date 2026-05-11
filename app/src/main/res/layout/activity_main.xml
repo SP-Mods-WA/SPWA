@@ -15,7 +15,7 @@
         android:layout_height="3dp"
         android:layout_alignParentTop="true"
         android:max="100"
-        android:progressTint="@color/colorAccent"
+        
         android:visibility="gone" />
 
 </RelativeLayout>
