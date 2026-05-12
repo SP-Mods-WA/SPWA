@@ -211,79 +211,123 @@ class MainActivity : AppCompatActivity() {
         (function() {
             if (document.getElementById('_wa_css')) return;
 
-            /* ── Viewport: make desktop page fit mobile screen ── */
+            /* Viewport scale for desktop→mobile */
             var vp = document.querySelector('meta[name=viewport]');
             if (!vp) { vp = document.createElement('meta'); vp.name='viewport'; document.head.appendChild(vp); }
-            vp.content = 'width=device-width, initial-scale=0.82, maximum-scale=2.0';
+            vp.content = 'width=device-width, initial-scale=1.0, maximum-scale=2.0';
 
             var s = document.createElement('style');
             s.id = '_wa_css';
             s.textContent = [
-                /* Push below native 60dp top bar */
-                'html { padding-top: 60px !important; background:#ECE5DD !important; }',
-                'body { background:#ECE5DD !important; }',
 
-                /* Hide WhatsApp Web's own header */
-                'header, [data-testid="conversation-header"] { display:none !important; }',
+                /* ══ BASE ══ */
+                'html, body { padding-top:60px !important; margin:0 !important;',
+                '  background:#ECE5DD !important; overflow-x:hidden !important; }',
+                '::-webkit-scrollbar { display:none !important; }',
 
-                /* Hide Windows promo banner */
-                '[data-testid="intro-desktop-app-promo"], a[href*="windows.whatsapp"] { display:none !important; }',
+                /* ══ HIDE DESKTOP CHROME ══ */
+                /* WhatsApp Web own header */
+                'header { display:none !important; }',
+                /* Left icon sidebar (Status, Channels, Communities icons) */
+                '[data-testid="navigation-bar-status"],',
+                '[data-testid="navigation-bar-chats"],',
+                '#side > span:first-child { display:none !important; }',
+                /* Windows promo */
+                '[data-testid="intro-desktop-app-promo"],',
+                'a[href*="windows.whatsapp"] { display:none !important; }',
 
-                /* ── Style the login landing card ── */
-                /* Center the main login card on screen */
-                '[data-testid="intro-md-beta-logo-dark"], [data-testid="intro-md-beta-logo-light"] { display:none !important; }',
+                /* ══ MAIN APP LAYOUT ══ */
+                /* #app is the root — full height */
+                '#app { height: calc(100vh - 60px) !important; }',
 
-                /* Make the QR/phone card look like a native card */
-                '.landing-wrapper, [class*="landing"] {',
-                '  display:flex !important; flex-direction:column !important;',
+                /* Two-panel layout: hide left nav strip, show only #side (chat list) */
+                /* When no chat open: show chat list full width */
+                '#side {',
+                '  width:100vw !important; min-width:100vw !important;',
+                '  max-width:100vw !important; display:flex !important;',
+                '  flex-direction:column !important;',
+                '}',
+
+                /* ══ CHAT LIST HEADER ══ */
+                '#side header, [data-testid="chatlist-header"] {',
+                '  display:flex !important; background:#075E54 !important;',
+                '  padding:10px 16px !important; align-items:center !important;',
+                '  height:56px !important; box-sizing:border-box !important;',
+                '}',
+                '[data-testid="chatlist-header"] * { color:white !important; }',
+
+                /* ══ SEARCH BAR ══ */
+                '[data-testid="chat-list-search"] {',
+                '  margin:8px 10px !important; border-radius:24px !important;',
+                '  background:#F0F2F5 !important; border:none !important;',
+                '}',
+
+                /* ══ CHAT LIST ITEMS ══ */
+                '[data-testid="cell-frame-container"] {',
+                '  padding:10px 16px !important; border-bottom:1px solid #F0F2F5 !important;',
+                '}',
+
+                /* ══ OPEN CHAT PANEL (#main) ══ */
+                /* When chat is open: hide #side, show #main full width */
+                '#app[data-chat-active="true"] #side { display:none !important; }',
+                '#main {',
+                '  width:100vw !important; min-width:100vw !important;',
+                '  max-width:100vw !important; left:0 !important;',
+                '  position:relative !important;',
+                '}',
+
+                /* Chat header */
+                '#main header {',
+                '  display:flex !important; background:#075E54 !important;',
+                '  color:white !important; padding:0 8px !important;',
+                '  height:56px !important; align-items:center !important;',
+                '  box-shadow:0 1px 4px rgba(0,0,0,0.2) !important;',
+                '}',
+                '#main header * { color:white !important; }',
+
+                /* Message input bar */
+                '[data-testid="conversation-compose-box"] {',
+                '  background:white !important; padding:8px !important;',
+                '  border-top:1px solid #E9EDEF !important;',
+                '}',
+
+                /* Send button */
+                '[data-testid="send"], [data-testid="compose-btn-send"] {',
+                '  background:#25D366 !important; border-radius:50% !important;',
+                '}',
+
+                /* ══ LOGIN PAGE ══ */
+                '.landing-wrapper { display:flex !important; flex-direction:column !important;',
                 '  align-items:center !important; justify-content:center !important;',
-                '  min-height:calc(100vh - 60px) !important; padding:16px !important;',
-                '}',
+                '  min-height:calc(100vh - 60px) !important; padding:20px !important; }',
+                'input[type="tel"], input[type="text"] {',
+                '  border:2px solid #25D366 !important; border-radius:10px !important;',
+                '  padding:12px 16px !important; font-size:16px !important;',
+                '  width:100% !important; box-sizing:border-box !important; }',
 
-                /* Card styling */
-                '[class*="intro-"] {',
-                '  background:white !important; border-radius:20px !important;',
-                '  box-shadow: 0 2px 20px rgba(0,0,0,0.10) !important;',
-                '  padding: 28px 20px !important; width:100% !important;',
-                '  max-width:380px !important;',
-                '}',
+                /* ══ TABLET/DESKTOP SPLIT VIEW FIX ══ */
+                /* Force single-column layout always */
+                '[class*="two-panel"], [class*="TwoPanel"] {',
+                '  flex-direction:column !important; }',
+                '._aigs { display:none !important; }' /* left icon rail */
 
-                /* Phone number button — make it look like a proper CTA */
-                '[data-testid="link-device-phone-num-tab"], a[class*="phone"] {',
-                '  background: #25D366 !important; color: white !important;',
-                '  border-radius: 28px !important; padding: 14px 28px !important;',
-                '  font-size: 15px !important; font-weight: 600 !important;',
-                '  display: inline-block !important; text-decoration: none !important;',
-                '  border: none !important; cursor: pointer !important;',
-                '  box-shadow: 0 4px 14px rgba(37,211,102,0.35) !important;',
-                '}',
-
-                /* Phone number input field */
-                'input[type="tel"], input[type="text"], input[type="number"] {',
-                '  border: 2px solid #25D366 !important; border-radius: 10px !important;',
-                '  padding: 12px 16px !important; font-size: 16px !important;',
-                '  width: 100% !important; outline: none !important;',
-                '}',
-
-                /* Submit/Next button */
-                'button[type="submit"], [data-testid*="submit"], [data-testid*="next"] {',
-                '  background: #075E54 !important; color: white !important;',
-                '  border-radius: 28px !important; padding: 14px !important;',
-                '  width: 100% !important; font-size: 15px !important;',
-                '  font-weight: 600 !important; border: none !important;',
-                '  margin-top: 16px !important; cursor: pointer !important;',
-                '}',
-
-                /* Country picker */
-                'select, [class*="country"] {',
-                '  border: 2px solid #e0e0e0 !important; border-radius: 10px !important;',
-                '  padding: 12px !important; font-size: 15px !important;',
-                '}',
-
-                /* Scrollbar hide */
-                '::-webkit-scrollbar { display: none !important; }'
             ].join(' ');
             document.head.appendChild(s);
+
+            /* ── Detect chat open/close → toggle #app attribute for CSS switching ── */
+            function checkChatState() {
+                var main = document.getElementById('main');
+                var app  = document.getElementById('app');
+                if (!app) return;
+                if (main && main.children.length > 0) {
+                    app.setAttribute('data-chat-active','true');
+                } else {
+                    app.removeAttribute('data-chat-active');
+                }
+            }
+            new MutationObserver(checkChatState)
+                .observe(document.documentElement, { childList:true, subtree:true });
+            checkChatState();
 
             /* Hide Windows promo dynamically */
             new MutationObserver(function() {
