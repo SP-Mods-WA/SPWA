@@ -52,16 +52,14 @@ class MainActivity : AppCompatActivity() {
         webView.loadUrl("https://web.whatsapp.com")
     }
 
-    // ─── WEBVIEW ──────────────────────────────────────────────────────────
     @SuppressLint("SetJavaScriptEnabled")
-    private fun buildWebView(): WebView = WebView(this).apply {
-        layoutParams = FrameLayout.LayoutParams(MATCH, MATCH)
+    private fun buildWebView(): WebView {
+        val wv = WebView(this)
+        wv.layoutParams = FrameLayout.LayoutParams(MATCH, MATCH)
+        wv.setLayerType(View.LAYER_TYPE_SOFTWARE, null)
+        wv.visibility = View.INVISIBLE
 
-        // SOFTWARE rendering = QR canvas always visible, never blank
-        setLayerType(View.LAYER_TYPE_SOFTWARE, null)
-        visibility = View.INVISIBLE
-
-        settings.apply {
+        wv.settings.apply {
             javaScriptEnabled     = true
             domStorageEnabled     = true
             databaseEnabled       = true
@@ -75,22 +73,15 @@ class MainActivity : AppCompatActivity() {
             mediaPlaybackRequiresUserGesture = false
             @Suppress("DEPRECATION")
             mixedContentMode = WebSettings.MIXED_CONTENT_ALWAYS_ALLOW
-
-            // ════════════════════════════════════════════════════════════
-            // KEY: Use a real Android Chrome UA that WhatsApp Web accepts.
-            // This loads the FULL WhatsApp Web (QR + chat) — not blocked.
-            // Tested: works on web.whatsapp.com without "use phone" wall.
-            // ════════════════════════════════════════════════════════════
             userAgentString =
                 "Mozilla/5.0 (Linux; Android 13; Pixel 7) " +
                 "AppleWebKit/537.36 (KHTML, like Gecko) " +
                 "Chrome/124.0.6367.82 Mobile Safari/537.36"
         }
 
-        CookieManager.getInstance().apply {
-            setAcceptCookie(true)
-            setAcceptThirdPartyCookies(this@apply, true)
-        }
+        CookieManager.getInstance().setAcceptCookie(true)
+        CookieManager.getInstance().setAcceptThirdPartyCookies(wv, true)
+        return wv
     }
 
     // ─── WEBVIEW CLIENT + CHROME CLIENT ──────────────────────────────────
