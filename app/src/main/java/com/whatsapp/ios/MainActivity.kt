@@ -196,23 +196,6 @@ class MainActivity : AppCompatActivity() {
                     progressBar.progress = newProgress
                 }
             }
-
-            // Block ALL JS alert() / confirm() dialogs globally
-            override fun onJsAlert(
-                view: WebView?, url: String?, message: String?,
-                result: android.webkit.JsResult?
-            ): Boolean {
-                result?.confirm()
-                return true
-            }
-
-            override fun onJsConfirm(
-                view: WebView?, url: String?, message: String?,
-                result: android.webkit.JsResult?
-            ): Boolean {
-                result?.confirm()
-                return true
-            }
         }
 
         webView.setOnKeyListener { _, keyCode, event ->
@@ -229,20 +212,10 @@ class MainActivity : AppCompatActivity() {
     /**
      * JavaScript injection to transform WhatsApp Web into a native app-like UI.
      * Hides desktop elements, scales QR to fit screen, adds app-style header & footer.
-     * FIX: Removed alert(). QR copied via toDataURL() to avoid blank canvas cross-origin issue.
      */
     private fun getInjectionScript(): String {
         return """
         (function() {
-            if (window.__waInjected) return;
-            window.__waInjected = true;
-
-            // === SUPPRESS ALL JS DIALOGS AT JS LEVEL ===
-            // WhatsApp Web may use React modals OR native alert — kill both
-            window.alert = function() {};
-            window.confirm = function() { return true; };
-            window.prompt = function() { return ''; };
-
             // === INJECT STYLE ===
             var style = document.createElement('style');
             style.innerHTML = `
@@ -442,71 +415,46 @@ class MainActivity : AppCompatActivity() {
             bottom.innerHTML = "Don't have an account? <a href='https://whatsapp.com/dl/'>Get started</a>";
             document.body.appendChild(bottom);
 
-            // === MOVE REAL QR CANVAS INTO OUR HOLDER ===
-            // Canvas cloneNode = blank (pixel data not copied). We MOVE the real element.
-            function moveQR() {
+            // === CLONE REAL QR CANVAS INTO OUR HOLDER ===
+            function cloneQR() {
                 var holder = document.getElementById('wa-qr-canvas-holder');
                 if (!holder) return;
-
+                
+                // Try canvas first
                 var realCanvas = document.querySelector('canvas');
-                if (realCanvas && realCanvas.parentNode !== holder) {
-                    realCanvas.style.cssText = 'width:100%!important;height:100%!important;display:block;border-radius:12px;';
+                if (realCanvas) {
+                    var clone = realCanvas.cloneNode(true);
                     holder.innerHTML = '';
-                    holder.appendChild(realCanvas);
+                    holder.appendChild(clone);
                     return;
                 }
-                // Fallback: base64 data URI image
-                var realImg = document.querySelector('img[src^="data:image"]');
-                if (realImg && realImg.parentNode !== holder) {
-                    realImg.style.cssText = 'width:100%!important;height:100%!important;display:block;border-radius:12px;';
+                // Try img
+                var realImg = document.querySelector('img[src*="qr"], img[alt*="QR"], img[alt*="qr"]');
+                if (realImg) {
+                    var imgClone = realImg.cloneNode(true);
                     holder.innerHTML = '';
-                    holder.appendChild(realImg);
+                    holder.appendChild(imgClone);
+                    return;
                 }
             }
 
-            // MutationObserver — watch for QR canvas appearing in DOM
-            var qrObserver = new MutationObserver(function() {
+            // Poll for QR element every 500ms
+            var qrInterval = setInterval(function() {
                 var canvas = document.querySelector('canvas');
-                if (canvas) {
-                    moveQR();
-                    // Re-check every 1s for QR refresh (WhatsApp rotates it)
-                    setInterval(moveQR, 1000);
-                    qrObserver.disconnect();
+                var img = document.querySelector('img[src*="qr"]');
+                if (canvas || img) {
+                    cloneQR();
+                    // Keep refreshing QR (it rotates)
+                    setInterval(cloneQR, 800);
+                    clearInterval(qrInterval);
                 }
-            });
-            qrObserver.observe(document.body, { childList: true, subtree: true });
-            // Also try immediately in case already rendered
-            moveQR();
+            }, 500);
 
-            // Phone number button — dispatch real pointer/mouse events to avoid React modal bug
+            // Phone number button click: click original hidden button
             document.getElementById('wa-phone-btn').addEventListener('click', function() {
-                // Try data-testid selectors WhatsApp Web uses
-                var selectors = [
-                    '[data-testid="link-device-phone-num-tab"]',
-                    '[data-testid="link-device-phone-num-btn"]',
-                    'a[href*="phone"]',
-                    '[aria-label*="phone" i]',
-                    '[data-testid*="phone"]'
-                ];
-                var target = null;
-                for (var i = 0; i < selectors.length; i++) {
-                    target = document.querySelector(selectors[i]);
-                    if (target) break;
-                }
-                if (!target) {
-                    // Text content fallback
-                    document.querySelectorAll('a, button, [role="button"]').forEach(function(el) {
-                        if (!target && el.textContent && el.textContent.toLowerCase().includes('phone')) {
-                            target = el;
-                        }
-                    });
-                }
-                if (target) {
-                    // Use dispatchEvent with real pointer events — avoids React synthetic event issues
-                    ['pointerdown','mousedown','pointerup','mouseup','click'].forEach(function(evtName) {
-                        target.dispatchEvent(new MouseEvent(evtName, {bubbles: true, cancelable: true, view: window}));
-                    });
-                }
+                var originalBtn = document.querySelector('a[href*="phone"], button[aria-label*="phone"], [data-testid*="phone"]');
+                if (originalBtn) originalBtn.click();
+                else alert('Please scan the QR code above to log in.');
             });
 
         })();
