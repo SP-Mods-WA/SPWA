@@ -44,7 +44,7 @@ class MainActivity : AppCompatActivity() {
                 allowContentAccess = true
                 cacheMode = android.webkit.WebSettings.LOAD_DEFAULT
 
-                // 🖥️ Desktop Chrome User-Agent (critical to get QR code)
+                // Desktop Chrome user-agent to get QR code (not blocked)
                 userAgentString = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36"
             }
 
@@ -87,58 +87,104 @@ class MainActivity : AppCompatActivity() {
         override fun onPageFinished(view: WebView?, url: String?) {
             super.onPageFinished(view, url)
 
-            // 🎨 Inject JavaScript to transform desktop UI into mobile-friendly layout
+            // 🎨 Transform desktop UI to perfectly fit phone screen
             view?.evaluateJavascript(
                 """
                 (function() {
-                    // Add meta viewport for proper scaling
-                    var meta = document.querySelector('meta[name=viewport]');
+                    // 1. Set proper viewport for mobile
+                    let meta = document.querySelector('meta[name=viewport]');
                     if (!meta) {
                         meta = document.createElement('meta');
                         meta.name = 'viewport';
                         document.head.appendChild(meta);
                     }
-                    meta.setAttribute('content', 'width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=yes');
+                    meta.setAttribute('content', 'width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=yes, viewport-fit=cover');
                     
-                    // Inject custom CSS to make WhatsApp Web look like a phone app
-                    var style = document.createElement('style');
+                    // 2. Inject CSS to make WhatsApp Web responsive as a phone app
+                    let style = document.createElement('style');
+                    style.id = 'mobile-wa-fix';
                     style.innerHTML = `
-                        /* Make the entire layout full width and remove sidebars */
-                        body, html {
-                            overflow-x: hidden !important;
+                        /* Global reset */
+                        html, body {
+                            margin: 0 !important;
+                            padding: 0 !important;
                             width: 100% !important;
+                            overflow-x: hidden !important;
                         }
-                        .app-wrapper, .two, ._akbu, ._aigs {
+                        /* Main container adjustments */
+                        ._akbu, .app-wrapper, .two, ._aigs {
                             width: 100% !important;
                             max-width: 100% !important;
+                            margin: 0 !important;
+                            padding: 0 !important;
+                            flex-direction: column !important;
                         }
-                        /* Force chat list to be full width on mobile */
-                        ._ak8q, ._akbu {
-                            width: 100vw !important;
+                        /* QR code container - make it big and centered */
+                        .landing-window, ._ak8o, [data-testid="landing-window"] {
+                            display: flex !important;
+                            flex-direction: column !important;
+                            align-items: center !important;
+                            justify-content: center !important;
+                            width: 100% !important;
+                            padding: 16px !important;
+                            box-sizing: border-box !important;
                         }
-                        /* Adjust font sizes for touch */
-                        ._ak8c, ._ak8d, ._ak8e {
+                        /* QR code image itself */
+                        img[src*="qr"], canvas, ._ak8r {
+                            width: 70vw !important;
+                            height: 70vw !important;
+                            max-width: 300px !important;
+                            max-height: 300px !important;
+                            margin: 20px auto !important;
+                        }
+                        /* Text and buttons */
+                        ._ak8c, ._ak8d, ._ak8e, ._ak8f {
+                            font-size: 16px !important;
+                            text-align: center !important;
+                            padding: 8px !important;
+                        }
+                        /* Hide desktop-only download button section or adjust */
+                        ._ak8g, ._ak8h, ._ak8i {
+                            display: none !important;
+                        }
+                        /* Buttons and inputs bigger for touch */
+                        button, a[role="button"], ._ak8x {
+                            min-height: 48px !important;
+                            padding: 12px 20px !important;
                             font-size: 16px !important;
                         }
-                        /* Make buttons and inputs larger for fingers */
-                        button, div[role="button"], input, ._ak8r {
-                            min-height: 44px !important;
+                        /* Ensure the left panel doesn't show as sidebar */
+                        ._akbu, ._ak8v {
+                            width: 100% !important;
+                            flex: 1 !important;
                         }
-                        /* Hide desktop-only elements that cause horizontal scroll */
+                        /* Hide any desktop intro panel that might cause overflow */
                         ._ak8s, ._ak8t, ._ak8u {
                             display: none !important;
                         }
-                        /* Ensure main chat area takes full width */
-                        ._akbu, ._ak8v {
-                            flex: 1 1 100% !important;
+                        /* Adjust the main chat area later when logged in */
+                        ._akbu._akbw, ._akbw {
+                            width: 100% !important;
+                            max-width: 100% !important;
+                        }
+                        /* Padding for bottom navigation (if any) */
+                        body {
+                            padding-bottom: env(safe-area-inset-bottom) !important;
                         }
                     `;
                     document.head.appendChild(style);
                     
-                    // Force a resize event to trigger WhatsApp's responsive adjustments
+                    // 3. Force a resize event so WhatsApp recalculates layout
                     window.dispatchEvent(new Event('resize'));
                     
-                    console.log('Desktop UI transformed to mobile-friendly mode');
+                    // 4. If the QR code is inside a canvas, ensure it scales
+                    var qrCanvas = document.querySelector('canvas');
+                    if (qrCanvas) {
+                        qrCanvas.style.width = 'min(70vw, 300px)';
+                        qrCanvas.style.height = 'auto';
+                    }
+                    
+                    console.log('Mobile UI injection complete');
                 })();
                 """.trimIndent(), null
             )
