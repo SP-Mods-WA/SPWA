@@ -44,8 +44,8 @@ class MainActivity : AppCompatActivity() {
                 allowContentAccess = true
                 cacheMode = android.webkit.WebSettings.LOAD_DEFAULT
 
-                // Android Phone Chrome User-Agent
-                userAgentString = "Mozilla/5.0 (Linux; Android 14; SM-S918B) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.6261.119 Mobile Safari/537.36"
+                // Mobile User-Agent
+                userAgentString = "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Mobile Safari/537.36"
             }
 
             webViewClient = MyWebViewClient()
@@ -86,9 +86,27 @@ class MainActivity : AppCompatActivity() {
 
         override fun onPageFinished(view: WebView?, url: String?) {
             super.onPageFinished(view, url)
+            // JavaScript Injection to remove detection flags
             view?.evaluateJavascript(
                 """
                 (function() {
+                    // Override the navigator.webdriver property
+                    Object.defineProperty(navigator, 'webdriver', {
+                        get: () => undefined
+                    });
+                    
+                    // Remove the webdriver attribute from the document element
+                    document.documentElement.setAttribute('webdriver', '');
+                    
+                    // Override the chrome property
+                    window.chrome = {
+                        runtime: {},
+                        loadTimes: function() {},
+                        csi: function() {},
+                        app: {}
+                    };
+                    
+                    // Force mobile viewport
                     var meta = document.querySelector('meta[name=viewport]');
                     if (meta) {
                         meta.setAttribute('content', 'width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=yes');
