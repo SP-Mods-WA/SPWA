@@ -2,6 +2,8 @@ package com.whatsapp.ios
 
 import android.annotation.SuppressLint
 import android.graphics.Color
+import android.graphics.Typeface
+import android.graphics.drawable.GradientDrawable
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
@@ -18,22 +20,28 @@ class MainActivity : AppCompatActivity() {
     private lateinit var webView: WebView
     private lateinit var rootLayout: FrameLayout
     private lateinit var splashLayout: FrameLayout
-    private lateinit var topBar: LinearLayout
+    private lateinit var topBar: FrameLayout
     private lateinit var progressBar: ProgressBar
     private lateinit var backBtn: TextView
+    private lateinit var titleTv: TextView
+    private lateinit var subtitleTv: TextView
+    private lateinit var avatarTv: TextView
     private val handler = Handler(Looper.getMainLooper())
     private var phoneClickAttempts = 0
+    private var pollingActive = false
 
     @SuppressLint("SetJavaScriptEnabled")
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        window.statusBarColor     = Color.parseColor("#F0EBE3")
+        window.navigationBarColor = Color.parseColor("#F0EBE3")
 
-        window.statusBarColor     = Color.parseColor("#075E54")
-        window.navigationBarColor = Color.parseColor("#075E54")
+        // Light status bar icons
+        window.decorView.systemUiVisibility = View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR
 
         rootLayout = FrameLayout(this).apply {
             layoutParams = ViewGroup.LayoutParams(MATCH, MATCH)
-            setBackgroundColor(Color.parseColor("#075E54"))
+            setBackgroundColor(Color.parseColor("#F0EBE3"))
         }
 
         webView      = buildWebView()
@@ -51,11 +59,15 @@ class MainActivity : AppCompatActivity() {
         webView.loadUrl("https://web.whatsapp.com")
     }
 
-    // ─── BUILD WEBVIEW ────────────────────────────────────────────────────
+    // ══════════════════════════════════════════════════════════════════════
+    // WEBVIEW
+    // ══════════════════════════════════════════════════════════════════════
     @SuppressLint("SetJavaScriptEnabled")
     private fun buildWebView(): WebView {
         val wv = WebView(this)
-        wv.layoutParams = FrameLayout.LayoutParams(MATCH, MATCH)
+        wv.layoutParams = FrameLayout.LayoutParams(MATCH, MATCH).also {
+            it.topMargin = dpToPx(56)
+        }
         wv.setLayerType(View.LAYER_TYPE_SOFTWARE, null)
         wv.visibility = View.INVISIBLE
 
@@ -73,11 +85,13 @@ class MainActivity : AppCompatActivity() {
             mediaPlaybackRequiresUserGesture = false
             @Suppress("DEPRECATION")
             mixedContentMode = WebSettings.MIXED_CONTENT_ALWAYS_ALLOW
-            // Desktop UA — required for WhatsApp Web to load properly
+
+            // ── This exact UA gives the mobile WhatsApp Web UI ──
+            // Same as Chrome on Android — shows QR + phone login + chat
             userAgentString =
-                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) " +
+                "Mozilla/5.0 (Linux; Android 13; Pixel 7 Build/TQ3A.230901.001) " +
                 "AppleWebKit/537.36 (KHTML, like Gecko) " +
-                "Chrome/124.0.0.0 Safari/537.36"
+                "Chrome/124.0.6367.82 Mobile Safari/537.36"
         }
 
         CookieManager.getInstance().setAcceptCookie(true)
@@ -85,7 +99,9 @@ class MainActivity : AppCompatActivity() {
         return wv
     }
 
-    // ─── WEBVIEW CLIENTS ──────────────────────────────────────────────────
+    // ══════════════════════════════════════════════════════════════════════
+    // WEBVIEW CLIENTS
+    // ══════════════════════════════════════════════════════════════════════
     private fun setupWebViewClients() {
         webView.webViewClient = object : WebViewClient() {
 
@@ -97,28 +113,33 @@ class MainActivity : AppCompatActivity() {
                 progressBar.visibility = View.GONE
                 phoneClickAttempts = 0
 
-                // Step 1: inject CSS to style the page
-                view.evaluateJavascript(getCss(), null)
+                // Inject CSS cleanup
+                view.evaluateJavascript(getCSS(), null)
 
-                // Step 2: after short delay, auto-click "Link with phone number"
-                handler.postDelayed({ tryClickPhoneLogin(view) }, 2000)
+                // Auto-handle page specific actions
+                handler.postDelayed({ handlePageActions(view, url) }, 1500)
 
                 // Show webview, hide splash
                 if (splashLayout.visibility == View.VISIBLE) {
                     handler.postDelayed({
-                        splashLayout.animate().alpha(0f).setDuration(400).withEndAction {
+                        splashLayout.animate().alpha(0f).setDuration(350).withEndAction {
                             splashLayout.visibility = View.GONE
                             webView.visibility = View.VISIBLE
                         }.start()
-                    }, 500)
+                    }, 600)
                 }
+
+                if (!pollingActive) { pollingActive = true; pollState(view) }
             }
 
             override fun shouldOverrideUrlLoading(view: WebView, url: String?): Boolean {
                 if (url == null) return false
-                return !(url.startsWith("https://web.whatsapp.com") ||
-                         url.startsWith("https://whatsapp.com")     ||
-                         url.startsWith("https://www.whatsapp.com"))
+                // Allow all WhatsApp domains
+                if (url.startsWith("https://web.whatsapp.com") ||
+                    url.startsWith("https://whatsapp.com")     ||
+                    url.startsWith("https://www.whatsapp.com")) return false
+                // Block external links
+                return true
             }
         }
 
@@ -127,8 +148,7 @@ class MainActivity : AppCompatActivity() {
                 progressBar.progress   = p
                 progressBar.visibility = if (p == 100) View.GONE else View.VISIBLE
             }
-
-            // Suppress ALL JS dialogs — WhatsApp Web shows alert() on phone button
+            // Suppress ALL JS dialogs
             override fun onJsAlert(v: WebView?, u: String?, m: String?, r: JsResult?): Boolean {
                 r?.confirm(); return true
             }
@@ -152,291 +172,273 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    // ─── AUTO CLICK PHONE LOGIN ───────────────────────────────────────────
-    // Tries multiple selectors WhatsApp Web uses for the phone number button.
-    // Retries up to 10 times (every 1s) in case React hasn't rendered it yet.
-    private fun tryClickPhoneLogin(view: WebView) {
-        if (phoneClickAttempts >= 10) return
-        phoneClickAttempts++
-
+    // ══════════════════════════════════════════════════════════════════════
+    // PAGE ACTION HANDLER
+    // "Download WhatsApp" page → auto click "Continue to WhatsApp Web"
+    // QR page → auto click "Log in with phone number"
+    // ══════════════════════════════════════════════════════════════════════
+    private fun handlePageActions(view: WebView, url: String?) {
         val js = """
             (function() {
-                // All known selectors for WhatsApp Web phone login button
-                var selectors = [
-                    '[data-testid="link-device-phone-num-tab"]',
-                    '[data-testid="link-device-phone-num-btn"]',
-                    'button[class*="phone"]',
-                    'a[href*="phone"]'
-                ];
-
-                // Also search by text content
-                var allClickable = document.querySelectorAll('button, a, [role="button"], [role="tab"]');
-                for (var i = 0; i < allClickable.length; i++) {
-                    var el = allClickable[i];
-                    var txt = (el.textContent || el.innerText || '').trim().toLowerCase();
-                    if (txt.indexOf('phone') !== -1 || txt.indexOf('phone number') !== -1) {
-                        selectors.push('#' + el.id);
-                        el.click();
-                        return 'clicked_by_text:' + txt.substring(0, 30);
+                // Page 1: "Download WhatsApp" interstitial
+                // Find "Continue to WhatsApp Web" button and click it
+                var allBtns = document.querySelectorAll('button, a, [role="button"]');
+                for (var i = 0; i < allBtns.length; i++) {
+                    var txt = (allBtns[i].textContent || '').trim().toLowerCase();
+                    if (txt.indexOf('continue') >= 0 && txt.indexOf('web') >= 0) {
+                        allBtns[i].click();
+                        return 'continue_clicked';
                     }
                 }
 
-                for (var j = 0; j < selectors.length; j++) {
-                    var btn = document.querySelector(selectors[j]);
-                    if (btn) {
-                        btn.click();
-                        return 'clicked_by_selector:' + selectors[j];
+                // Page 2: QR page — click "Log in with phone number"
+                for (var j = 0; j < allBtns.length; j++) {
+                    var t = (allBtns[j].textContent || '').trim().toLowerCase();
+                    if (t.indexOf('phone') >= 0) {
+                        allBtns[j].click();
+                        return 'phone_clicked';
                     }
                 }
-                return 'not_found';
+
+                var sel = document.querySelector('[data-testid="link-device-phone-num-tab"]');
+                if (sel) { sel.click(); return 'phone_sel_clicked'; }
+
+                return 'nothing';
             })()
         """.trimIndent()
 
         view.evaluateJavascript(js) { result ->
-            val r = result?.trim('"') ?: "not_found"
-            if (r == "not_found" && phoneClickAttempts < 10) {
-                // Button not found yet — retry after 1 second
-                handler.postDelayed({ tryClickPhoneLogin(view) }, 1000)
-            }
-            // If clicked successfully, update back button visibility
-            if (r.startsWith("clicked")) {
-                runOnUiThread {
-                    backBtn.visibility = View.VISIBLE
+            val r = result?.trim('"') ?: ""
+            when {
+                r == "nothing" && phoneClickAttempts < 10 -> {
+                    phoneClickAttempts++
+                    handler.postDelayed({ handlePageActions(view, url) }, 1000)
+                }
+                r.contains("phone") -> {
+                    runOnUiThread { backBtn.visibility = View.VISIBLE }
                 }
             }
         }
     }
 
-    private fun getCss(): String = """
+    // ══════════════════════════════════════════════════════════════════════
+    // PAGE STATE POLLING → update native top bar
+    // ══════════════════════════════════════════════════════════════════════
+    private fun pollState(view: WebView) {
+        if (!view.isAttachedToWindow) { pollingActive = false; return }
+        val js = """
+            (function() {
+                var chatTitle = document.querySelector(
+                    '#main header [data-testid="conversation-info-header-chat-title"],' +
+                    '#main header span[dir="auto"]'
+                );
+                if (chatTitle && chatTitle.textContent.trim().length > 0)
+                    return 'chat:' + chatTitle.textContent.trim();
+                if (document.getElementById('side')) return 'list';
+                if (document.querySelector('input[type="tel"]')) return 'phone';
+                return 'login';
+            })()
+        """.trimIndent()
+
+        view.evaluateJavascript(js) { res ->
+            val r = res?.trim('"') ?: "login"
+            when {
+                r.startsWith("chat:") -> {
+                    val name = r.removePrefix("chat:").take(22)
+                    setChatTopBar(name, name.firstOrNull()?.toString() ?: "?")
+                }
+                r == "list"  -> setChatListTopBar()
+                r == "phone" -> setPhoneTopBar()
+                else         -> setDefaultTopBar()
+            }
+        }
+        handler.postDelayed({ pollState(view) }, 800)
+    }
+
+    // ══════════════════════════════════════════════════════════════════════
+    // TOP BAR STATE SETTERS
+    // ══════════════════════════════════════════════════════════════════════
+    private fun setDefaultTopBar() = runOnUiThread {
+        backBtn.visibility    = View.GONE
+        avatarTv.text         = "W"
+        avatarTv.background   = circleDrawable("#25D366", dpToPx(36))
+        titleTv.text          = "WhatsApp"
+        titleTv.setTextColor(Color.parseColor("#25D366"))
+        subtitleTv.visibility = View.GONE
+    }
+
+    private fun setPhoneTopBar() = runOnUiThread {
+        backBtn.visibility    = View.VISIBLE
+        avatarTv.text         = "W"
+        avatarTv.background   = circleDrawable("#25D366", dpToPx(36))
+        titleTv.text          = "WhatsApp"
+        titleTv.setTextColor(Color.parseColor("#25D366"))
+        subtitleTv.visibility = View.GONE
+    }
+
+    private fun setChatListTopBar() = runOnUiThread {
+        backBtn.visibility    = View.GONE
+        avatarTv.text         = "W"
+        avatarTv.background   = circleDrawable("#25D366", dpToPx(36))
+        titleTv.text          = "WhatsApp"
+        titleTv.setTextColor(Color.parseColor("#25D366"))
+        subtitleTv.visibility = View.GONE
+    }
+
+    private fun setChatTopBar(name: String, initial: String) = runOnUiThread {
+        backBtn.visibility  = View.VISIBLE
+        avatarTv.text       = initial.uppercase()
+        avatarTv.background = circleDrawable("#06CF9C", dpToPx(36))
+        titleTv.text        = name
+        titleTv.setTextColor(Color.parseColor("#111B21"))
+        subtitleTv.text       = "tap for info"
+        subtitleTv.visibility = View.VISIBLE
+    }
+
+    // ══════════════════════════════════════════════════════════════════════
+    // CSS — minimal cleanup, WhatsApp Web mobile renders correctly
+    // ══════════════════════════════════════════════════════════════════════
+    private fun getCSS(): String = """
         (function() {
             if (document.getElementById('_wa_css')) return;
-
-            /* Viewport scale for desktop→mobile */
-            var vp = document.querySelector('meta[name=viewport]');
-            if (!vp) { vp = document.createElement('meta'); vp.name='viewport'; document.head.appendChild(vp); }
-            vp.content = 'width=device-width, initial-scale=1.0, maximum-scale=2.0';
-
             var s = document.createElement('style');
             s.id = '_wa_css';
-            s.textContent = [
-
-                /* ══ BASE ══ */
-                'html, body { padding-top:60px !important; margin:0 !important;',
-                '  background:#ECE5DD !important; overflow-x:hidden !important; }',
-                '::-webkit-scrollbar { display:none !important; }',
-
-                /* ══ HIDE DESKTOP CHROME ══ */
-                /* WhatsApp Web own header */
-                'header { display:none !important; }',
-                /* Left icon sidebar (Status, Channels, Communities icons) */
-                '[data-testid="navigation-bar-status"],',
-                '[data-testid="navigation-bar-chats"],',
-                '#side > span:first-child { display:none !important; }',
-                /* Windows promo */
-                '[data-testid="intro-desktop-app-promo"],',
-                'a[href*="windows.whatsapp"] { display:none !important; }',
-
-                /* ══ MAIN APP LAYOUT ══ */
-                /* #app is the root — full height */
-                '#app { height: calc(100vh - 60px) !important; }',
-
-                /* Two-panel layout: hide left nav strip, show only #side (chat list) */
-                /* When no chat open: show chat list full width */
-                '#side {',
-                '  width:100vw !important; min-width:100vw !important;',
-                '  max-width:100vw !important; display:flex !important;',
-                '  flex-direction:column !important;',
-                '}',
-
-                /* ══ CHAT LIST HEADER ══ */
-                '#side header, [data-testid="chatlist-header"] {',
-                '  display:flex !important; background:#075E54 !important;',
-                '  padding:10px 16px !important; align-items:center !important;',
-                '  height:56px !important; box-sizing:border-box !important;',
-                '}',
-                '[data-testid="chatlist-header"] * { color:white !important; }',
-
-                /* ══ SEARCH BAR ══ */
-                '[data-testid="chat-list-search"] {',
-                '  margin:8px 10px !important; border-radius:24px !important;',
-                '  background:#F0F2F5 !important; border:none !important;',
-                '}',
-
-                /* ══ CHAT LIST ITEMS ══ */
-                '[data-testid="cell-frame-container"] {',
-                '  padding:10px 16px !important; border-bottom:1px solid #F0F2F5 !important;',
-                '}',
-
-                /* ══ OPEN CHAT PANEL (#main) ══ */
-                /* When chat is open: hide #side, show #main full width */
-                '#app[data-chat-active="true"] #side { display:none !important; }',
-                '#main {',
-                '  width:100vw !important; min-width:100vw !important;',
-                '  max-width:100vw !important; left:0 !important;',
-                '  position:relative !important;',
-                '}',
-
-                /* Chat header */
-                '#main header {',
-                '  display:flex !important; background:#075E54 !important;',
-                '  color:white !important; padding:0 8px !important;',
-                '  height:56px !important; align-items:center !important;',
-                '  box-shadow:0 1px 4px rgba(0,0,0,0.2) !important;',
-                '}',
-                '#main header * { color:white !important; }',
-
-                /* Message input bar */
-                '[data-testid="conversation-compose-box"] {',
-                '  background:white !important; padding:8px !important;',
-                '  border-top:1px solid #E9EDEF !important;',
-                '}',
-
-                /* Send button */
-                '[data-testid="send"], [data-testid="compose-btn-send"] {',
-                '  background:#25D366 !important; border-radius:50% !important;',
-                '}',
-
-                /* ══ LOGIN PAGE ══ */
-                '.landing-wrapper { display:flex !important; flex-direction:column !important;',
-                '  align-items:center !important; justify-content:center !important;',
-                '  min-height:calc(100vh - 60px) !important; padding:20px !important; }',
-                'input[type="tel"], input[type="text"] {',
-                '  border:2px solid #25D366 !important; border-radius:10px !important;',
-                '  padding:12px 16px !important; font-size:16px !important;',
-                '  width:100% !important; box-sizing:border-box !important; }',
-
-                /* ══ TABLET/DESKTOP SPLIT VIEW FIX ══ */
-                /* Force single-column layout always */
-                '[class*="two-panel"], [class*="TwoPanel"] {',
-                '  flex-direction:column !important; }',
-                '._aigs { display:none !important; }' /* left icon rail */
-
-            ].join(' ');
+            s.textContent =
+                /* Push content below our native 56dp top bar */
+                'html { padding-top: 56px !important; box-sizing:border-box; }' +
+                /* Hide WhatsApp's own top bar — we show our native one */
+                'header._aigs, ._aigt { display:none !important; }' +
+                /* Scrollbar */
+                '::-webkit-scrollbar { display:none !important; }';
             document.head.appendChild(s);
-
-            /* ── Detect chat open/close → toggle #app attribute for CSS switching ── */
-            function checkChatState() {
-                var main = document.getElementById('main');
-                var app  = document.getElementById('app');
-                if (!app) return;
-                if (main && main.children.length > 0) {
-                    app.setAttribute('data-chat-active','true');
-                } else {
-                    app.removeAttribute('data-chat-active');
-                }
-            }
-            new MutationObserver(checkChatState)
-                .observe(document.documentElement, { childList:true, subtree:true });
-            checkChatState();
-
-            /* Hide Windows promo dynamically */
-            new MutationObserver(function() {
-                document.querySelectorAll(
-                    '[data-testid="intro-desktop-app-promo"], a[href*="windows.whatsapp"]'
-                ).forEach(function(el) {
-                    (el.closest('div') || el).style.display = 'none';
-                });
-            }).observe(document.documentElement, { childList:true, subtree:true });
         })();
     """.trimIndent()
 
-    // ─── NATIVE UI ────────────────────────────────────────────────────────
-    private fun buildTopBar(): LinearLayout {
-        val bar = LinearLayout(this).apply {
-            orientation  = LinearLayout.HORIZONTAL
-            setBackgroundColor(Color.parseColor("#075E54"))
-            gravity      = Gravity.CENTER_VERTICAL
-            elevation    = 16f
-            layoutParams = FrameLayout.LayoutParams(MATCH, dpToPx(60))
+    // ══════════════════════════════════════════════════════════════════════
+    // NATIVE TOP BAR  — matches WhatsApp mobile browser style
+    // Light background, green WhatsApp logo text, back arrow
+    // ══════════════════════════════════════════════════════════════════════
+    private fun buildTopBar(): FrameLayout {
+        val bar = FrameLayout(this).apply {
+            layoutParams = FrameLayout.LayoutParams(MATCH, dpToPx(56))
+            setBackgroundColor(Color.parseColor("#F0EBE3"))
+            elevation = 2f
         }
 
+        val row = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity     = Gravity.CENTER_VERTICAL
+            layoutParams = FrameLayout.LayoutParams(MATCH, MATCH)
+            setPadding(dpToPx(4), 0, dpToPx(12), 0)
+        }
+
+        // Back arrow
         backBtn = TextView(this).apply {
-            text       = "‹"
-            textSize   = 32f
-            setTextColor(Color.WHITE)
-            gravity    = Gravity.CENTER
-            setPadding(dpToPx(18), 0, dpToPx(4), dpToPx(2))
+            text      = "←"
+            textSize  = 20f
+            setTextColor(Color.parseColor("#111B21"))
+            gravity   = Gravity.CENTER
+            setPadding(dpToPx(10), 0, dpToPx(6), 0)
             visibility = View.GONE
             setOnClickListener {
                 phoneClickAttempts = 0
                 if (webView.canGoBack()) webView.goBack()
-                backBtn.visibility = View.GONE
             }
         }
 
-        // WhatsApp circle icon
-        val iconWrapper = FrameLayout(this).apply {
-            setPadding(dpToPx(16), 0, dpToPx(10), 0)
-            layoutParams = LinearLayout.LayoutParams(dpToPx(66), MATCH)
-        }
-        val iconBg = TextView(this).apply {
-            text      = "W"
-            textSize  = 17f
-            typeface  = android.graphics.Typeface.DEFAULT_BOLD
-            setTextColor(Color.parseColor("#075E54"))
-            gravity   = Gravity.CENTER
-            background = android.graphics.drawable.GradientDrawable().apply {
-                shape = android.graphics.drawable.GradientDrawable.OVAL
-                setColor(Color.WHITE)
-                setSize(dpToPx(38), dpToPx(38))
+        // Avatar
+        val avatarWrap = FrameLayout(this).apply {
+            layoutParams = LinearLayout.LayoutParams(dpToPx(36), dpToPx(36)).also {
+                it.marginStart = dpToPx(10)
+                it.marginEnd   = dpToPx(10)
             }
-            layoutParams = FrameLayout.LayoutParams(dpToPx(38), dpToPx(38), Gravity.CENTER)
         }
-        iconWrapper.addView(iconBg)
+        avatarTv = TextView(this).apply {
+            text       = "W"
+            textSize   = 14f
+            typeface   = Typeface.DEFAULT_BOLD
+            setTextColor(Color.WHITE)
+            gravity    = Gravity.CENTER
+            background = circleDrawable("#25D366", dpToPx(36))
+            layoutParams = FrameLayout.LayoutParams(dpToPx(36), dpToPx(36))
+        }
+        avatarWrap.addView(avatarTv)
 
-        val textCol = LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL
-            gravity     = Gravity.CENTER_VERTICAL
-            layoutParams = LinearLayout.LayoutParams(0, MATCH, 1f)
+        // Title + subtitle
+        val col = LinearLayout(this).apply {
+            orientation  = LinearLayout.VERTICAL
+            gravity      = Gravity.CENTER_VERTICAL
+            layoutParams = LinearLayout.LayoutParams(0, WRAP, 1f)
         }
-        val titleTv = TextView(this).apply {
+        titleTv = TextView(this).apply {
             text     = "WhatsApp"
-            textSize = 19f
-            setTextColor(Color.WHITE)
-            typeface = android.graphics.Typeface.DEFAULT_BOLD
+            textSize = 18f
+            typeface = Typeface.DEFAULT_BOLD
+            setTextColor(Color.parseColor("#25D366"))
         }
-        val subtitleTv = TextView(this).apply {
-            text     = "End-to-end encrypted"
-            textSize = 11f
-            setTextColor(Color.parseColor("#B2DFDB"))
+        subtitleTv = TextView(this).apply {
+            text      = "tap for info"
+            textSize  = 11f
+            setTextColor(Color.parseColor("#667781"))
+            visibility = View.GONE
         }
-        textCol.addView(titleTv)
-        textCol.addView(subtitleTv)
+        col.addView(titleTv); col.addView(subtitleTv)
 
-        // Three-dot menu icon (decorative)
-        val menuBtn = TextView(this).apply {
-            text     = "⋮"
-            textSize = 22f
-            setTextColor(Color.WHITE)
-            gravity  = Gravity.CENTER
-            setPadding(0, 0, dpToPx(16), 0)
+        // Right icons row
+        val icons = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity     = Gravity.CENTER_VERTICAL
+        }
+        listOf("⟳", "⌨", "↓", "?").forEach { icon ->
+            icons.addView(TextView(this).apply {
+                text     = icon
+                textSize = 16f
+                setTextColor(Color.parseColor("#667781"))
+                gravity  = Gravity.CENTER
+                setPadding(dpToPx(6), 0, dpToPx(6), 0)
+            })
         }
 
-        bar.addView(backBtn)
-        bar.addView(iconWrapper)
-        bar.addView(textCol)
-        bar.addView(menuBtn)
+        row.addView(backBtn)
+        row.addView(avatarWrap)
+        row.addView(col)
+        row.addView(icons)
+        bar.addView(row)
+
+        // Bottom border
+        bar.addView(View(this).apply {
+            layoutParams = FrameLayout.LayoutParams(MATCH, dpToPx(1)).also {
+                it.gravity = Gravity.BOTTOM
+            }
+            setBackgroundColor(Color.parseColor("#E0DDD8"))
+        })
         return bar
     }
 
+    // ══════════════════════════════════════════════════════════════════════
+    // PROGRESS BAR
+    // ══════════════════════════════════════════════════════════════════════
     private fun buildProgressBar(): ProgressBar =
         ProgressBar(this, null, android.R.attr.progressBarStyleHorizontal).apply {
             max = 100
-            progressTintList = android.content.res.ColorStateList.valueOf(Color.parseColor("#25D366"))
-            layoutParams = FrameLayout.LayoutParams(MATCH, dpToPx(3)).also {
-                it.topMargin = dpToPx(60)
+            progressTintList = android.content.res.ColorStateList
+                .valueOf(Color.parseColor("#25D366"))
+            layoutParams = FrameLayout.LayoutParams(MATCH, dpToPx(2)).also {
+                it.topMargin = dpToPx(56)
             }
             visibility = View.GONE
         }
 
+    // ══════════════════════════════════════════════════════════════════════
+    // SPLASH SCREEN  — matches WhatsApp mobile style
+    // ══════════════════════════════════════════════════════════════════════
     private fun buildSplashLayout(): FrameLayout {
-        // Full-screen splash — WhatsApp official green with centered branding
         val splash = FrameLayout(this).apply {
             layoutParams = FrameLayout.LayoutParams(MATCH, MATCH)
-            setBackgroundColor(Color.parseColor("#075E54"))
+            setBackgroundColor(Color.parseColor("#F0EBE3"))
         }
 
-        // Center column
+        // Center content
         val col = LinearLayout(this).apply {
             orientation  = LinearLayout.VERTICAL
             gravity      = Gravity.CENTER_HORIZONTAL
@@ -445,83 +447,84 @@ class MainActivity : AppCompatActivity() {
             }
         }
 
-        // Big circular icon
-        val iconFrame = FrameLayout(this).apply {
-            layoutParams = LinearLayout.LayoutParams(dpToPx(100), dpToPx(100)).also {
+        // WhatsApp logo circle
+        col.addView(FrameLayout(this).apply {
+            layoutParams = LinearLayout.LayoutParams(dpToPx(80), dpToPx(80)).also {
                 it.gravity = Gravity.CENTER_HORIZONTAL
             }
-        }
-        val iconCircle = TextView(this).apply {
-            text      = "W"
-            textSize  = 42f
-            typeface  = android.graphics.Typeface.DEFAULT_BOLD
-            setTextColor(Color.parseColor("#075E54"))
-            gravity   = Gravity.CENTER
-            background = android.graphics.drawable.GradientDrawable().apply {
-                shape = android.graphics.drawable.GradientDrawable.OVAL
-                setColor(Color.WHITE)
-                setSize(dpToPx(100), dpToPx(100))
-            }
-            layoutParams = FrameLayout.LayoutParams(dpToPx(100), dpToPx(100))
-        }
-        iconFrame.addView(iconCircle)
-        col.addView(iconFrame)
-
-        // App name
-        col.addView(TextView(this).apply {
-            text     = "WhatsApp"
-            textSize = 28f
-            setTextColor(Color.WHITE)
-            typeface = android.graphics.Typeface.DEFAULT_BOLD
-            gravity  = Gravity.CENTER
-            setPadding(0, dpToPx(20), 0, dpToPx(8))
+            addView(TextView(this@MainActivity).apply {
+                text       = "W"
+                textSize   = 36f
+                typeface   = Typeface.DEFAULT_BOLD
+                setTextColor(Color.WHITE)
+                gravity    = Gravity.CENTER
+                background = circleDrawable("#25D366", dpToPx(80))
+                layoutParams = FrameLayout.LayoutParams(dpToPx(80), dpToPx(80))
+            })
         })
 
-        // Tagline
+        col.addView(spacer(24))
+
+        col.addView(TextView(this).apply {
+            text     = "WhatsApp"
+            textSize = 24f
+            typeface = Typeface.DEFAULT_BOLD
+            setTextColor(Color.parseColor("#25D366"))
+            gravity  = Gravity.CENTER
+        })
+
+        col.addView(spacer(8))
+
         col.addView(TextView(this).apply {
             text     = "Simple. Reliable. Private."
-            textSize = 14f
-            setTextColor(Color.parseColor("#B2DFDB"))
+            textSize = 13f
+            setTextColor(Color.parseColor("#667781"))
             gravity  = Gravity.CENTER
         })
 
         splash.addView(col)
 
-        // Bottom section — "from Meta" + loading bar
-        val bottomCol = LinearLayout(this).apply {
+        // Bottom section
+        val bottom = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             gravity     = Gravity.CENTER_HORIZONTAL
             layoutParams = FrameLayout.LayoutParams(MATCH, WRAP, Gravity.BOTTOM).also {
-                it.bottomMargin = dpToPx(48)
+                it.bottomMargin = dpToPx(36)
             }
         }
-
-        // Thin loading bar (WhatsApp style)
-        val loadBar = ProgressBar(this, null, android.R.attr.progressBarStyleHorizontal).apply {
+        bottom.addView(ProgressBar(this, null, android.R.attr.progressBarStyleHorizontal).apply {
             isIndeterminate = true
             indeterminateTintList = android.content.res.ColorStateList
                 .valueOf(Color.parseColor("#25D366"))
-            layoutParams = LinearLayout.LayoutParams(dpToPx(160), dpToPx(3)).also {
-                it.gravity     = Gravity.CENTER_HORIZONTAL
-                it.bottomMargin = dpToPx(20)
+            layoutParams = LinearLayout.LayoutParams(dpToPx(120), dpToPx(2)).also {
+                it.gravity      = Gravity.CENTER_HORIZONTAL
+                it.bottomMargin = dpToPx(14)
             }
-        }
-
-        val fromMeta = TextView(this).apply {
+        })
+        bottom.addView(TextView(this).apply {
             text     = "from Meta"
-            textSize = 13f
-            setTextColor(Color.parseColor("#80CBC4"))
+            textSize = 12f
+            setTextColor(Color.parseColor("#667781"))
             gravity  = Gravity.CENTER
-        }
-
-        bottomCol.addView(loadBar)
-        bottomCol.addView(fromMeta)
-        splash.addView(bottomCol)
-
+        })
+        splash.addView(bottom)
         return splash
     }
 
-    // ─── HELPERS ──────────────────────────────────────────────────────────
+    // ══════════════════════════════════════════════════════════════════════
+    // HELPERS
+    // ══════════════════════════════════════════════════════════════════════
+    private fun spacer(dp: Int) = View(this).apply {
+        layoutParams = LinearLayout.LayoutParams(1, dpToPx(dp))
+    }
+
+    private fun circleDrawable(hexColor: String, size: Int): GradientDrawable =
+        GradientDrawable().apply {
+            shape = GradientDrawable.OVAL
+            setColor(Color.parseColor(hexColor))
+            setSize(size, size)
+        }
+
     private fun dpToPx(dp: Int) = (dp * resources.displayMetrics.density).toInt()
     private val MATCH = ViewGroup.LayoutParams.MATCH_PARENT
     private val WRAP  = ViewGroup.LayoutParams.WRAP_CONTENT
@@ -534,14 +537,9 @@ class MainActivity : AppCompatActivity() {
     }
     @Deprecated("Deprecated in Java")
     override fun onBackPressed() {
-        if (webView.canGoBack()) {
-            webView.goBack()
-            backBtn.visibility = View.GONE
-        } else super.onBackPressed()
+        if (webView.canGoBack()) webView.goBack() else super.onBackPressed()
     }
     override fun onDestroy() {
-        handler.removeCallbacksAndMessages(null)
-        webView.destroy()
-        super.onDestroy()
+        handler.removeCallbacksAndMessages(null); webView.destroy(); super.onDestroy()
     }
 }
