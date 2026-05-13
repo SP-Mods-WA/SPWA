@@ -1,10 +1,8 @@
 package com.whatsapp.ios
 
 import android.annotation.SuppressLint
-import android.graphics.Bitmap
 import android.os.Bundle
 import android.view.KeyEvent
-import android.view.View
 import android.webkit.WebChromeClient
 import android.webkit.WebResourceRequest
 import android.webkit.WebView
@@ -35,21 +33,29 @@ class MainActivity : AppCompatActivity() {
 
             settings.apply {
                 javaScriptEnabled = true
-                domStorageEnabled = true
-                loadWithOverviewMode = true
-                useWideViewPort = true
+                domStorageEnabled = true                // WhatsApp Web uses localStorage
+                databaseEnabled = true                  // for IndexedDB
+                setSupportZoom(true)
                 builtInZoomControls = true
                 displayZoomControls = false
-                setSupportZoom(true)
-                defaultTextEncodingName = "utf-8"
-                loadsImagesAutomatically = true
+                loadWithOverviewMode = true
+                useWideViewPort = true
+                allowFileAccess = true                  // needed for some internal stuff
+                allowContentAccess = true
+                setAppCacheEnabled(true)
+                cacheMode = android.webkit.WebSettings.LOAD_DEFAULT
 
-                // Android Phone Chrome User-Agent
-                userAgentString = "Mozilla/5.0 (Linux; Android 13; SM-G991B) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.6099.210 Mobile Safari/537.36"
+                // ✅ Most important: Modern Android Chrome Mobile User-Agent
+                userAgentString = "Mozilla/5.0 (Linux; Android 14; SM-S918B) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.6261.119 Mobile Safari/537.36"
             }
 
             webViewClient = MyWebViewClient()
-            webChromeClient = MyWebChromeClient()
+            webChromeClient = WebChromeClient()   // basic one is enough
+
+            // Clear cache and cookies before loading (optional but helpful for testing)
+            clearCache(true)
+            clearHistory()
+
             loadUrl("https://web.whatsapp.com")
         }
 
@@ -57,6 +63,7 @@ class MainActivity : AppCompatActivity() {
         setContentView(rootLayout)
     }
 
+    // Back button support
     override fun onKeyDown(keyCode: Int, event: KeyEvent?): Boolean {
         if (keyCode == KeyEvent.KEYCODE_BACK && webView.canGoBack()) {
             webView.goBack()
@@ -70,28 +77,36 @@ class MainActivity : AppCompatActivity() {
         super.onDestroy()
     }
 
+    // Custom WebViewClient to prevent external redirects and force mobile version
     private inner class MyWebViewClient : WebViewClient() {
         override fun shouldOverrideUrlLoading(view: WebView?, request: WebResourceRequest?): Boolean {
             val url = request?.url.toString()
-            return if (url.startsWith("https://web.whatsapp.com")) false else true
-        }
-
-        override fun onPageStarted(view: WebView?, url: String?, favicon: Bitmap?) {
-            super.onPageStarted(view, url, favicon)
+            // only allow WhatsApp Web domain
+            return if (url.startsWith("https://web.whatsapp.com")) {
+                false   // load inside WebView
+            } else {
+                true    // do not open external browser
+            }
         }
 
         override fun onPageFinished(view: WebView?, url: String?) {
             super.onPageFinished(view, url)
+            // Extra safety: inject viewport meta to force mobile layout
             view?.evaluateJavascript(
-                "document.querySelector('meta[name=viewport]').setAttribute('content','width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=yes');",
-                null
+                """
+                (function() {
+                    var meta = document.querySelector('meta[name=viewport]');
+                    if (meta) {
+                        meta.setAttribute('content', 'width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=yes');
+                    } else {
+                        var newMeta = document.createElement('meta');
+                        newMeta.name = 'viewport';
+                        newMeta.content = 'width=device-width, initial-scale=1.0';
+                        document.head.appendChild(newMeta);
+                    }
+                })();
+                """.trimIndent(), null
             )
-        }
-    }
-
-    private inner class MyWebChromeClient : WebChromeClient() {
-        override fun onProgressChanged(view: WebView?, newProgress: Int) {
-            super.onProgressChanged(view, newProgress)
         }
     }
 }
