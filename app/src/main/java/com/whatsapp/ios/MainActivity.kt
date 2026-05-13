@@ -3,13 +3,11 @@ package com.whatsapp.ios
 import android.annotation.SuppressLint
 import android.os.Bundle
 import android.view.KeyEvent
-import android.webkit.JavascriptInterface
 import android.webkit.WebChromeClient
 import android.webkit.WebResourceRequest
 import android.webkit.WebView
 import android.webkit.WebViewClient
 import android.widget.FrameLayout
-import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 
 class MainActivity : AppCompatActivity() {
@@ -20,7 +18,6 @@ class MainActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        // Create root layout programmatically
         val rootLayout = FrameLayout(this).apply {
             layoutParams = FrameLayout.LayoutParams(
                 FrameLayout.LayoutParams.MATCH_PARENT,
@@ -36,7 +33,7 @@ class MainActivity : AppCompatActivity() {
 
             settings.apply {
                 javaScriptEnabled = true
-                domStorageEnabled = true          // WhatsApp Web uses localStorage
+                domStorageEnabled = true
                 databaseEnabled = true
                 setSupportZoom(true)
                 builtInZoomControls = true
@@ -47,17 +44,12 @@ class MainActivity : AppCompatActivity() {
                 allowContentAccess = true
                 cacheMode = android.webkit.WebSettings.LOAD_DEFAULT
 
-                // 🧙‍♂️ Trick WhatsApp: Spoof as Google Chrome on Android phone
-                userAgentString = "Mozilla/5.0 (Linux; Android 13; SM-G998B) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.6261.119 Mobile Safari/537.36"
+                // 🖥️ Desktop Chrome User-Agent (critical to get QR code)
+                userAgentString = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36"
             }
 
             webViewClient = MyWebViewClient()
-            webChromeClient = MyWebChromeClient()
-
-            // Enable remote debugging (optional, for Chrome DevTools)
-            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.KITKAT) {
-                WebView.setWebContentsDebuggingEnabled(true)
-            }
+            webChromeClient = WebChromeClient()
 
             clearCache(true)
             clearHistory()
@@ -69,7 +61,6 @@ class MainActivity : AppCompatActivity() {
         setContentView(rootLayout)
     }
 
-    // Handle back button for WebView navigation
     override fun onKeyDown(keyCode: Int, event: KeyEvent?): Boolean {
         if (keyCode == KeyEvent.KEYCODE_BACK && webView.canGoBack()) {
             webView.goBack()
@@ -83,15 +74,12 @@ class MainActivity : AppCompatActivity() {
         super.onDestroy()
     }
 
-    // Custom WebViewClient to intercept page loading and inject JS
     private inner class MyWebViewClient : WebViewClient() {
         override fun shouldOverrideUrlLoading(view: WebView?, request: WebResourceRequest?): Boolean {
             val url = request?.url.toString()
-            // Stay inside WhatsApp Web domain
             return if (url.startsWith("https://web.whatsapp.com")) {
                 false
             } else {
-                // Open external links in browser (optional)
                 true
             }
         }
@@ -99,67 +87,61 @@ class MainActivity : AppCompatActivity() {
         override fun onPageFinished(view: WebView?, url: String?) {
             super.onPageFinished(view, url)
 
-            // 🎨 Inject JavaScript to force mobile UI and remove any "desktop" detection
+            // 🎨 Inject JavaScript to transform desktop UI into mobile-friendly layout
             view?.evaluateJavascript(
                 """
                 (function() {
-                    // 1. Override navigator.webdriver to avoid detection as automation
-                    Object.defineProperty(navigator, 'webdriver', {
-                        get: () => undefined
-                    });
-                    
-                    // 2. Remove any webdriver attribute from html element
-                    if (document.documentElement.hasAttribute('webdriver')) {
-                        document.documentElement.removeAttribute('webdriver');
-                    }
-                    
-                    // 3. Fake Chrome runtime object
-                    window.chrome = window.chrome || { runtime: {}, loadTimes: function() {}, csi: function() {}, app: {} };
-                    
-                    // 4. Force viewport to be exactly phone-like
+                    // Add meta viewport for proper scaling
                     var meta = document.querySelector('meta[name=viewport]');
-                    if (meta) {
-                        meta.setAttribute('content', 'width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=yes, viewport-fit=cover');
-                    } else {
-                        var newMeta = document.createElement('meta');
-                        newMeta.name = 'viewport';
-                        newMeta.content = 'width=device-width, initial-scale=1.0, user-scalable=yes';
-                        document.head.appendChild(newMeta);
+                    if (!meta) {
+                        meta = document.createElement('meta');
+                        meta.name = 'viewport';
+                        document.head.appendChild(meta);
                     }
+                    meta.setAttribute('content', 'width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=yes');
                     
-                    // 5. Add custom CSS to make UI fit perfectly on phone
+                    // Inject custom CSS to make WhatsApp Web look like a phone app
                     var style = document.createElement('style');
                     style.innerHTML = `
-                        /* Force WhatsApp Web to use full screen width like a phone app */
-                        body {
+                        /* Make the entire layout full width and remove sidebars */
+                        body, html {
                             overflow-x: hidden !important;
+                            width: 100% !important;
                         }
-                        .app-wrapper, .two, ._akbu {
+                        .app-wrapper, .two, ._akbu, ._aigs {
+                            width: 100% !important;
                             max-width: 100% !important;
                         }
-                        /* Make sure the chat list and chat panel take full width */
-                        ._akbu {
-                            width: 100% !important;
+                        /* Force chat list to be full width on mobile */
+                        ._ak8q, ._akbu {
+                            width: 100vw !important;
                         }
-                        /* Optional: hide desktop-only elements if any */
-                        .landing-window, .intro {
-                            width: 100% !important;
+                        /* Adjust font sizes for touch */
+                        ._ak8c, ._ak8d, ._ak8e {
+                            font-size: 16px !important;
+                        }
+                        /* Make buttons and inputs larger for fingers */
+                        button, div[role="button"], input, ._ak8r {
+                            min-height: 44px !important;
+                        }
+                        /* Hide desktop-only elements that cause horizontal scroll */
+                        ._ak8s, ._ak8t, ._ak8u {
+                            display: none !important;
+                        }
+                        /* Ensure main chat area takes full width */
+                        ._akbu, ._ak8v {
+                            flex: 1 1 100% !important;
                         }
                     `;
                     document.head.appendChild(style);
                     
-                    console.log('UI forced to mobile phone mode');
+                    // Force a resize event to trigger WhatsApp's responsive adjustments
+                    window.dispatchEvent(new Event('resize'));
+                    
+                    console.log('Desktop UI transformed to mobile-friendly mode');
                 })();
                 """.trimIndent(), null
             )
-        }
-    }
-
-    // Optional: handle JavaScript dialogs, progress, etc.
-    private inner class MyWebChromeClient : WebChromeClient() {
-        override fun onProgressChanged(view: WebView?, newProgress: Int) {
-            super.onProgressChanged(view, newProgress)
-            // You can show a progress bar here if needed
         }
     }
 }
