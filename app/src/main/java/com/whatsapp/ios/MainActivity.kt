@@ -2,6 +2,8 @@ package com.whatsapp.ios
 
 import android.annotation.SuppressLint
 import android.os.Bundle
+import android.os.Handler
+import android.os.Looper
 import android.view.KeyEvent
 import android.webkit.WebChromeClient
 import android.webkit.WebResourceRequest
@@ -44,7 +46,7 @@ class MainActivity : AppCompatActivity() {
                 allowContentAccess = true
                 cacheMode = android.webkit.WebSettings.LOAD_DEFAULT
 
-                // Desktop Chrome user-agent to get QR code (not blocked)
+                // Desktop Chrome User-Agent (to get QR code)
                 userAgentString = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36"
             }
 
@@ -87,107 +89,104 @@ class MainActivity : AppCompatActivity() {
         override fun onPageFinished(view: WebView?, url: String?) {
             super.onPageFinished(view, url)
 
-            // 🎨 Transform desktop UI to perfectly fit phone screen
-            view?.evaluateJavascript(
-                """
-                (function() {
-                    // 1. Set proper viewport for mobile
-                    let meta = document.querySelector('meta[name=viewport]');
-                    if (!meta) {
-                        meta = document.createElement('meta');
-                        meta.name = 'viewport';
-                        document.head.appendChild(meta);
-                    }
-                    meta.setAttribute('content', 'width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=yes, viewport-fit=cover');
-                    
-                    // 2. Inject CSS to make WhatsApp Web responsive as a phone app
-                    let style = document.createElement('style');
-                    style.id = 'mobile-wa-fix';
-                    style.innerHTML = `
-                        /* Global reset */
-                        html, body {
-                            margin: 0 !important;
-                            padding: 0 !important;
-                            width: 100% !important;
-                            overflow-x: hidden !important;
+            // Delay injection slightly to ensure DOM is ready
+            Handler(Looper.getMainLooper()).postDelayed({
+                view?.evaluateJavascript(
+                    """
+                    (function() {
+                        console.log("Starting UI injection...");
+                        
+                        // 1. Force viewport for mobile scaling
+                        let meta = document.querySelector('meta[name=viewport]');
+                        if (!meta) {
+                            meta = document.createElement('meta');
+                            meta.name = 'viewport';
+                            document.head.appendChild(meta);
                         }
-                        /* Main container adjustments */
-                        ._akbu, .app-wrapper, .two, ._aigs {
-                            width: 100% !important;
-                            max-width: 100% !important;
-                            margin: 0 !important;
-                            padding: 0 !important;
-                            flex-direction: column !important;
+                        meta.setAttribute('content', 'width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=yes');
+                        
+                        // 2. Find all possible QR code containers and scale them
+                        function scaleQrCode() {
+                            // Common selectors for WhatsApp Web QR container
+                            let qrContainer = document.querySelector('[data-testid="qr-code"]') ||
+                                              document.querySelector('._ak8o') ||
+                                              document.querySelector('._ak8r') ||
+                                              document.querySelector('div[class*="qr"]') ||
+                                              document.querySelector('canvas')?.parentElement;
+                            
+                            if (qrContainer) {
+                                qrContainer.style.display = 'flex';
+                                qrContainer.style.flexDirection = 'column';
+                                qrContainer.style.alignItems = 'center';
+                                qrContainer.style.justifyContent = 'center';
+                                qrContainer.style.width = '100%';
+                                qrContainer.style.padding = '20px';
+                                qrContainer.style.boxSizing = 'border-box';
+                            }
+                            
+                            // Scale the actual QR image or canvas
+                            let qrElement = document.querySelector('canvas') || 
+                                           document.querySelector('img[alt*="QR"]') ||
+                                           document.querySelector('img[src*="qr"]');
+                            if (qrElement) {
+                                let size = Math.min(window.innerWidth * 0.7, 280);
+                                qrElement.style.width = size + 'px';
+                                qrElement.style.height = size + 'px';
+                                qrElement.style.maxWidth = '100%';
+                                qrElement.style.margin = '20px auto';
+                            }
                         }
-                        /* QR code container - make it big and centered */
-                        .landing-window, ._ak8o, [data-testid="landing-window"] {
-                            display: flex !important;
-                            flex-direction: column !important;
-                            align-items: center !important;
-                            justify-content: center !important;
-                            width: 100% !important;
-                            padding: 16px !important;
-                            box-sizing: border-box !important;
+                        
+                        // 3. Adjust text and buttons
+                        function adjustText() {
+                            let allText = document.querySelectorAll('p, span, div, h1, h2, h3, h4, ._ak8c, ._ak8d, ._ak8e');
+                            allText.forEach(el => {
+                                if (el.innerText && el.innerText.length > 0) {
+                                    el.style.fontSize = '16px';
+                                    el.style.lineHeight = '1.4';
+                                    el.style.textAlign = 'center';
+                                }
+                            });
+                            
+                            // Make buttons touch-friendly
+                            let buttons = document.querySelectorAll('button, a[role="button"], ._ak8x, ._ak8r');
+                            buttons.forEach(btn => {
+                                btn.style.minHeight = '48px';
+                                btn.style.padding = '12px 24px';
+                                btn.style.fontSize = '16px';
+                                btn.style.margin = '8px';
+                            });
                         }
-                        /* QR code image itself */
-                        img[src*="qr"], canvas, ._ak8r {
-                            width: 70vw !important;
-                            height: 70vw !important;
-                            max-width: 300px !important;
-                            max-height: 300px !important;
-                            margin: 20px auto !important;
+                        
+                        // 4. Hide desktop-only download section
+                        function hideDesktopElements() {
+                            let downloadSection = document.querySelector('._ak8g, ._ak8h, ._ak8i');
+                            if (downloadSection) downloadSection.style.display = 'none';
+                            // Also hide any "Download WhatsApp for Windows" text container
+                            let downloadText = Array.from(document.querySelectorAll('*')).find(el => el.innerText?.includes('Download WhatsApp for Windows'));
+                            if (downloadText) downloadText.style.display = 'none';
                         }
-                        /* Text and buttons */
-                        ._ak8c, ._ak8d, ._ak8e, ._ak8f {
-                            font-size: 16px !important;
-                            text-align: center !important;
-                            padding: 8px !important;
-                        }
-                        /* Hide desktop-only download button section or adjust */
-                        ._ak8g, ._ak8h, ._ak8i {
-                            display: none !important;
-                        }
-                        /* Buttons and inputs bigger for touch */
-                        button, a[role="button"], ._ak8x {
-                            min-height: 48px !important;
-                            padding: 12px 20px !important;
-                            font-size: 16px !important;
-                        }
-                        /* Ensure the left panel doesn't show as sidebar */
-                        ._akbu, ._ak8v {
-                            width: 100% !important;
-                            flex: 1 !important;
-                        }
-                        /* Hide any desktop intro panel that might cause overflow */
-                        ._ak8s, ._ak8t, ._ak8u {
-                            display: none !important;
-                        }
-                        /* Adjust the main chat area later when logged in */
-                        ._akbu._akbw, ._akbw {
-                            width: 100% !important;
-                            max-width: 100% !important;
-                        }
-                        /* Padding for bottom navigation (if any) */
-                        body {
-                            padding-bottom: env(safe-area-inset-bottom) !important;
-                        }
-                    `;
-                    document.head.appendChild(style);
-                    
-                    // 3. Force a resize event so WhatsApp recalculates layout
-                    window.dispatchEvent(new Event('resize'));
-                    
-                    // 4. If the QR code is inside a canvas, ensure it scales
-                    var qrCanvas = document.querySelector('canvas');
-                    if (qrCanvas) {
-                        qrCanvas.style.width = 'min(70vw, 300px)';
-                        qrCanvas.style.height = 'auto';
-                    }
-                    
-                    console.log('Mobile UI injection complete');
-                })();
-                """.trimIndent(), null
-            )
+                        
+                        // 5. Apply all adjustments
+                        scaleQrCode();
+                        adjustText();
+                        hideDesktopElements();
+                        
+                        // 6. Observe if DOM changes (e.g., after login)
+                        const observer = new MutationObserver(() => {
+                            scaleQrCode();
+                            adjustText();
+                            hideDesktopElements();
+                        });
+                        observer.observe(document.body, { childList: true, subtree: true });
+                        
+                        // Force resize to recalculate
+                        window.dispatchEvent(new Event('resize'));
+                        console.log("Injection complete: QR code scaled, desktop elements hidden.");
+                    })();
+                    """.trimIndent(), null
+                )
+            }, 500) // 500ms delay
         }
     }
 }
