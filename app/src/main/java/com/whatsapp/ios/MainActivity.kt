@@ -33,26 +33,24 @@ class MainActivity : AppCompatActivity() {
 
             settings.apply {
                 javaScriptEnabled = true
-                domStorageEnabled = true                // WhatsApp Web uses localStorage
-                databaseEnabled = true                  // for IndexedDB
+                domStorageEnabled = true
+                databaseEnabled = true
                 setSupportZoom(true)
                 builtInZoomControls = true
                 displayZoomControls = false
                 loadWithOverviewMode = true
                 useWideViewPort = true
-                allowFileAccess = true                  // needed for some internal stuff
+                allowFileAccess = true
                 allowContentAccess = true
-                setAppCacheEnabled(true)
                 cacheMode = android.webkit.WebSettings.LOAD_DEFAULT
 
-                // ✅ Most important: Modern Android Chrome Mobile User-Agent
+                // Android Phone Chrome User-Agent
                 userAgentString = "Mozilla/5.0 (Linux; Android 14; SM-S918B) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.6261.119 Mobile Safari/537.36"
             }
 
             webViewClient = MyWebViewClient()
-            webChromeClient = WebChromeClient()   // basic one is enough
+            webChromeClient = WebChromeClient()
 
-            // Clear cache and cookies before loading (optional but helpful for testing)
             clearCache(true)
             clearHistory()
 
@@ -63,7 +61,6 @@ class MainActivity : AppCompatActivity() {
         setContentView(rootLayout)
     }
 
-    // Back button support
     override fun onKeyDown(keyCode: Int, event: KeyEvent?): Boolean {
         if (keyCode == KeyEvent.KEYCODE_BACK && webView.canGoBack()) {
             webView.goBack()
@@ -77,21 +74,18 @@ class MainActivity : AppCompatActivity() {
         super.onDestroy()
     }
 
-    // Custom WebViewClient to prevent external redirects and force mobile version
     private inner class MyWebViewClient : WebViewClient() {
         override fun shouldOverrideUrlLoading(view: WebView?, request: WebResourceRequest?): Boolean {
             val url = request?.url.toString()
-            // only allow WhatsApp Web domain
             return if (url.startsWith("https://web.whatsapp.com")) {
-                false   // load inside WebView
+                false
             } else {
-                true    // do not open external browser
+                true
             }
         }
 
         override fun onPageFinished(view: WebView?, url: String?) {
             super.onPageFinished(view, url)
-            // Extra safety: inject viewport meta to force mobile layout
             view?.evaluateJavascript(
                 """
                 (function() {
